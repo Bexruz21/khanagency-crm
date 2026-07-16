@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../api'
+import { useToastStore } from '../stores/toasts'
 import AppModal from '../components/AppModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import UserAvatar from '../components/UserAvatar.vue'
@@ -12,6 +13,7 @@ import ReportTab from '../components/brand/ReportTab.vue'
 import { BRAND_STATUS, fmtDate, fmtMoney } from '../labels'
 
 const route = useRoute()
+const toasts = useToastStore()
 const brand = ref(null)
 const tab = ref('overview')
 const users = ref([])
@@ -125,9 +127,19 @@ async function confirmResearch() {
     const { data } = await api.post(`/brands/${brand.value.id}/research/confirm/`, {
       draft: researchDraft.value,
       sources: researchSources.value,
-    })
+      generate_assets: true,
+    }, { timeout: 300000 })
     brand.value = data
     researchModal.value = false
+    const generated = data.auto_generation?.generated || []
+    const errors = data.auto_generation?.errors || {}
+    if (generated.includes('swot') && generated.includes('strategy')) {
+      toasts.push('Данные подтверждены. SWOT и стратегия созданы автоматически.', 'success')
+    } else if (Object.keys(errors).length) {
+      const labels = { swot: 'SWOT', strategy: 'стратегия' }
+      const failed = Object.keys(errors).map((key) => labels[key] || key).join(', ')
+      toasts.push(`Данные сохранены, но не удалось создать: ${failed}. Можно повторить во вкладке.`, 'danger')
+    }
   } catch (error) {
     researchError.value = error.response?.data?.detail || 'Не удалось сохранить подтверждённые данные.'
   } finally {
@@ -396,7 +408,7 @@ async function confirmResearch() {
           <span v-if="researching" class="spinner" />{{ researching ? 'Ищем и проверяем…' : '✦ Начать поиск' }}
         </button>
         <button v-else class="btn" :disabled="confirmingResearch" @click="confirmResearch">
-          {{ confirmingResearch ? 'Сохраняем…' : 'Подтвердить данные' }}
+          {{ confirmingResearch ? 'Сохраняем и создаём SWOT…' : 'Подтвердить данные' }}
         </button>
       </template>
     </AppModal>

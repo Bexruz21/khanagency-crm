@@ -34,7 +34,11 @@ async function generate() {
   generating.value = true
   error.value = ''
   try {
-    const { data } = await api.post(`/brands/${props.brand.id}/swot/generate/`, { brief: brief.value })
+    const { data } = await api.post(
+      `/brands/${props.brand.id}/swot/generate/`,
+      { brief: brief.value },
+      { timeout: 240000 },
+    )
     swot.value = data
     aiModal.value = false
   } catch (e) {

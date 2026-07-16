@@ -107,9 +107,11 @@ async function generateIdeas() {
   generating.value = true
   aiError.value = ''
   try {
-    const { data } = await api.post('/content/generate-ideas/', {
-      brand: props.brand.id, brief: brief.value, count: ideaCount.value,
-    })
+    const { data } = await api.post(
+      '/content/generate-ideas/',
+      { brand: props.brand.id, brief: brief.value, count: ideaCount.value },
+      { timeout: 240000 },
+    )
     ideas.value = data.ideas.map((i) => ({ ...i, selected: true }))
   } catch (e) {
     aiError.value = e.response?.data?.detail || 'Ошибка генерации'
