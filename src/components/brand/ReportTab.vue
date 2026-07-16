@@ -56,6 +56,14 @@ const contentCards = computed(() => {
     { label: 'Идей в очереди', value: c.ideas },
   ]
 })
+
+function completionRate(row) {
+  return row.total ? Math.round((row.done / row.total) * 100) : 0
+}
+
+function rateTone(value) {
+  return value >= 80 ? 'good' : value >= 50 ? 'mid' : 'bad'
+}
 </script>
 
 <template>
@@ -92,10 +100,20 @@ const contentCards = computed(() => {
         </div>
       </div>
 
+      <div v-if="report.insights?.length" class="insights rise">
+        <div v-for="item in report.insights" :key="item.text" class="insight" :class="item.tone">
+          <span class="insight-mark" aria-hidden="true" />
+          <p>{{ item.text }}</p>
+        </div>
+      </div>
+
       <div class="grid2">
         <section class="card panel rise">
           <h2>Этапы задач</h2>
           <p class="muted small">Где сейчас находятся задачи — большие доли в «работе» и «проверке» показывают этапы задержек</p>
+          <div v-if="statusRows.length" class="distribution" aria-label="Распределение задач по статусам">
+            <span v-for="row in statusRows" :key="row.key" :style="{ width: row.pct + '%', background: row.color }" :title="`${row.label}: ${row.count}`" />
+          </div>
           <div v-for="row in statusRows" :key="row.key" class="bar-row">
             <span class="bar-label">{{ row.label }}</span>
             <div class="bar-track">
@@ -107,38 +125,23 @@ const contentCards = computed(() => {
 
         <section class="card panel rise">
           <h2>Эффективность сотрудников</h2>
-          <p class="muted small">Кто сдаёт в срок, а кто с опозданием</p>
-          <table class="perf-table">
-            <thead>
-              <tr>
-                <th>Сотрудник</th>
-                <th class="c">В&nbsp;срок</th>
-                <th class="c">Опозд.</th>
-                <th class="c">Проср.</th>
-                <th class="c">% в&nbsp;срок</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in report.by_assignee" :key="r.user">
-                <td>
-                  <span class="emp">
-                    <span class="dot" :style="{ background: r.color }" />
-                    {{ r.user }}
-                  </span>
-                </td>
-                <td class="c"><span class="chip green" v-if="r.on_time">{{ r.on_time }}</span><span v-else class="zero">0</span></td>
-                <td class="c"><span class="chip amber" v-if="r.late">{{ r.late }}</span><span v-else class="zero">0</span></td>
-                <td class="c"><span class="chip red" v-if="r.overdue">{{ r.overdue }}</span><span v-else class="zero">0</span></td>
-                <td class="c">
-                  <span v-if="r.on_time_rate !== null" class="rate"
-                    :class="r.on_time_rate >= 80 ? 'good' : r.on_time_rate >= 50 ? 'mid' : 'bad'">
-                    {{ r.on_time_rate }}%
-                  </span>
-                  <span v-else class="zero">—</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <p class="muted small">Завершение задач и соблюдение дедлайнов по каждому исполнителю</p>
+          <div class="employee-list">
+            <article v-for="r in report.by_assignee" :key="r.user" class="employee-card">
+              <div class="employee-head">
+                <span class="emp"><span class="dot" :style="{ background: r.color }" />{{ r.user }}</span>
+                <strong :class="rateTone(r.on_time_rate ?? 0)">{{ r.on_time_rate !== null ? `${r.on_time_rate}% в срок` : 'Нет завершённых' }}</strong>
+              </div>
+              <div class="meter-label"><span>Выполнено {{ r.done }} из {{ r.total }}</span><span>{{ completionRate(r) }}%</span></div>
+              <div class="eff-meter"><span :style="{ width: completionRate(r) + '%' }" /></div>
+              <div class="employee-metrics">
+                <span class="good">{{ r.on_time }} в срок</span>
+                <span class="mid">{{ r.late }} с задержкой</span>
+                <span class="bad">{{ r.overdue }} просрочено</span>
+              </div>
+            </article>
+            <p v-if="!report.by_assignee.length" class="muted">Исполнители ещё не назначены</p>
+          </div>
         </section>
       </div>
 
@@ -188,6 +191,13 @@ const contentCards = computed(() => {
 .ring-wrap h2 { font-size: 1.05rem; }
 .muted { color: var(--muted); font-size: 0.85rem; }
 .small { margin-bottom: 12px; }
+.insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.insight { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--accent-ink); }
+.insight.green { background: var(--green-soft); color: var(--green); }
+.insight.amber { background: var(--amber-soft); color: var(--amber); }
+.insight.red { background: var(--red-soft); color: var(--red); }
+.insight-mark { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; flex: none; background: currentColor; }
+.insight p { margin: 0; font-size: 0.84rem; line-height: 1.45; font-weight: 580; }
 
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .stat { padding: 14px 16px; display: flex; flex-direction: column; }
@@ -200,6 +210,8 @@ const contentCards = computed(() => {
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 .panel { padding: 18px 20px; }
 .panel h2 { font-size: 1.02rem; margin-bottom: 6px; }
+.distribution { display: flex; width: 100%; height: 13px; overflow: hidden; border-radius: 99px; background: var(--line); margin: 4px 0 12px; }
+.distribution span { min-width: 2px; transition: width 500ms var(--ease-in-out); }
 
 .bar-row { display: flex; align-items: center; gap: 12px; padding: 7px 0; }
 .bar-label { width: 120px; font-size: 0.86rem; }
@@ -213,26 +225,20 @@ td { padding: 9px 6px; border-bottom: 1px solid var(--line); }
 tr:last-child td { border-bottom: 0; }
 .pct-cell { color: var(--accent-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
 
-.perf-table th.c, .perf-table td.c { text-align: center; }
 .emp { display: inline-flex; align-items: center; gap: 8px; }
 .emp .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-.perf-table .chip {
-  display: inline-block;
-  min-width: 24px;
-  padding: 2px 7px;
-  border-radius: 99px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.perf-table .chip.green { background: var(--green-soft); color: var(--green); }
-.perf-table .chip.amber { background: var(--amber-soft); color: var(--amber); }
-.perf-table .chip.red { background: var(--red-soft); color: var(--red); }
-.perf-table .zero { color: var(--muted); }
-.rate { font-weight: 700; font-variant-numeric: tabular-nums; }
-.rate.good { color: var(--green); }
-.rate.mid { color: var(--amber); }
-.rate.bad { color: var(--red); }
+.employee-list { display: flex; flex-direction: column; gap: 9px; max-height: 420px; overflow-y: auto; padding-right: 2px; }
+.employee-card { padding: 11px 12px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+.employee-head, .meter-label, .employee-metrics { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.employee-head { font-size: 0.85rem; }
+.employee-head > strong { font-size: 0.75rem; white-space: nowrap; }
+.meter-label { color: var(--muted); font-size: 0.72rem; margin: 9px 0 5px; }
+.eff-meter { height: 7px; border-radius: 99px; overflow: hidden; background: var(--line); }
+.eff-meter span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 500ms var(--ease-in-out); }
+.employee-metrics { justify-content: flex-start; flex-wrap: wrap; margin-top: 8px; font-size: 0.72rem; font-weight: 650; }
+.good { color: var(--green); }
+.mid { color: var(--amber); }
+.bad { color: var(--red); }
 
 .section-title { font-size: 1.15rem; margin: 22px 0 12px; }
 .content-stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 14px; }
@@ -264,7 +270,8 @@ tr:last-child td { border-bottom: 0; }
   .panel { padding: 16px; overflow-x: auto; }
   .bar-row { gap: 8px; }
   .bar-label { width: 84px; font-size: 0.78rem; }
-  .perf-table { min-width: 520px; }
+  .employee-head { align-items: flex-start; }
+  .employee-head > strong { white-space: normal; text-align: right; }
   .overdue-row { gap: 10px; }
 }
 </style>

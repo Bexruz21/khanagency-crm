@@ -105,8 +105,9 @@ label { text-align: left; }
   .shake { animation: none; }
 }
 @media (max-width: 480px) {
-  .login-page { padding: 14px; }
-  .login-card { padding: 28px 22px 22px; }
+  .login-page { min-height: 100dvh; height: auto; padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); overflow-y: auto; }
+  .login-card { padding: 26px 20px 22px; }
+  .login-card .input { font-size: 16px; }
   .login-btn { min-height: 46px; }
 }
 </style>

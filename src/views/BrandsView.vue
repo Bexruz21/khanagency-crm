@@ -186,7 +186,7 @@ h3 { font-size: 1.08rem; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 @media (max-width: 640px) {
-  .head { align-items: stretch; flex-direction: column; }
+  .head { align-items: stretch; flex-direction: column; gap: 12px; }
   .head .btn { width: 100%; }
   .cards { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .brand-card { padding: 16px; }

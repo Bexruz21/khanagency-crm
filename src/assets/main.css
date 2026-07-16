@@ -264,5 +264,5 @@ label.field { display: block; font-size: 0.8rem; font-weight: 590; letter-spacin
   :root { font-size: 15px; --radius: 16px; }
   .page-title { font-size: 1.55rem; margin-bottom: 16px; }
   .card { border-radius: var(--radius); }
-  .input, .select { min-height: 44px; }
+  .input, .select, .textarea { min-height: 44px; font-size: 16px; }
 }

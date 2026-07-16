@@ -110,6 +110,7 @@ function isActive(item) {
           v-for="item in nav" :key="item.to" :to="item.to"
           class="nav-item" :class="{ active: isActive(item) }"
           :title="collapsed ? item.label : ''"
+          :aria-label="item.label"
         >
           <svg viewBox="0 0 24 24" width="19" height="19"><path :d="item.icon" fill="currentColor" /></svg>
           <span class="label">{{ item.label }}</span>
@@ -323,15 +324,13 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
     min-height: 52px;
     margin: 0;
     padding: 5px 2px 4px;
-    flex-direction: column;
+    flex-direction: row;
     justify-content: center;
-    gap: 2px;
+    gap: 0;
     border-radius: 14px;
-    font-size: 0.67rem;
-    line-height: 1.1;
   }
-  .nav-item svg { width: 21px; height: 21px; }
-  .collapsed .nav-item .label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .nav-item svg { width: 23px; height: 23px; }
+  .nav-item .label, .collapsed .nav-item .label { display: none; }
   .sidebar-user,
   .collapsed .sidebar-user {
     flex: 0 0 auto;

@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import api from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
+import KhanCoinIcon from '../components/KhanCoinIcon.vue'
 import { PRIORITY, TASK_STATUS, fmtDate } from '../labels'
 import { useAuthStore } from '../stores/auth'
 
@@ -43,7 +44,7 @@ const cards = [
     <template v-else>
       <div class="stats">
         <div class="card stat rise coins" :class="{ neg: data.counters.khan_coins < 0 }">
-          <span class="num">🪙 {{ Number(data.counters.khan_coins).toLocaleString('ru-RU') }}</span>
+          <span class="num coin-num"><KhanCoinIcon :size="27" /> {{ Number(data.counters.khan_coins).toLocaleString('ru-RU') }}</span>
           <span class="lbl">Khan Coins · +50 000 за задачу в срок</span>
         </div>
         <div v-for="c in cards" :key="c.key" class="card stat rise" :class="c.tone">
@@ -134,6 +135,7 @@ const cards = [
 .stat.red { border-left-color: var(--red); }
 .stat.coins { border-left-color: var(--amber); background: color-mix(in srgb, var(--amber) 7%, var(--surface)); }
 .stat.coins .num { color: var(--amber); }
+.coin-num { display: inline-flex; align-items: center; gap: 7px; }
 .stat.coins.neg { border-left-color: var(--red); background: color-mix(in srgb, var(--red) 7%, var(--surface)); }
 .stat.coins.neg .num { color: var(--red); }
 

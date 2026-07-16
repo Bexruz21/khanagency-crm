@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import api from '../api'
 import AppModal from '../components/AppModal.vue'
 import UserAvatar from '../components/UserAvatar.vue'
+import KhanCoinIcon from '../components/KhanCoinIcon.vue'
 import { ROLE, fmtDate } from '../labels'
 import { useAuthStore } from '../stores/auth'
 
@@ -88,7 +89,7 @@ async function save() {
           <span class="lbl">активных<br />задач</span>
         </div>
         <div class="contact">
-          <span class="coins" :class="{ neg: u.khan_coins < 0 }">🪙 {{ fmtCoins(u.khan_coins) }}</span>
+          <span class="coins" :class="{ neg: u.khan_coins < 0 }"><KhanCoinIcon :size="17" /> {{ fmtCoins(u.khan_coins) }}</span>
           <span v-if="u.telegram_chat_id" class="tg">✈ Telegram</span>
           <span class="more">Статистика →</span>
         </div>
@@ -100,7 +101,7 @@ async function save() {
       <div v-if="stats" class="stats-body">
         <div class="coin-hero" :class="{ neg: stats.counters.khan_coins < 0 }">
           <span class="coin-label">Khan Coins</span>
-          <span class="coin-value">🪙 {{ fmtCoins(stats.counters.khan_coins) }}</span>
+          <span class="coin-value"><KhanCoinIcon :size="24" /> {{ fmtCoins(stats.counters.khan_coins) }}</span>
         </div>
 
         <div class="grid6">
@@ -215,6 +216,7 @@ async function save() {
 .contact { grid-column: 1 / -1; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 0.8rem; padding-top: 8px; border-top: 1px solid var(--line); margin-top: 8px; }
 .tg { color: var(--sky); }
 .coins { font-weight: 700; color: var(--amber); font-variant-numeric: tabular-nums; }
+.coins, .coin-value { display: inline-flex; align-items: center; gap: 6px; }
 .coins.neg { color: var(--red); }
 .more { margin-left: auto; color: var(--accent); font-weight: 600; }
 
@@ -287,7 +289,7 @@ async function save() {
 .error { color: var(--red); font-size: 0.85rem; }
 
 @media (max-width: 640px) {
-  .head { align-items: stretch; flex-direction: column; }
+  .head { align-items: stretch; flex-direction: column; gap: 12px; }
   .head .btn { width: 100%; }
   .cards { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .person { padding: 16px; gap: 4px 10px; }
