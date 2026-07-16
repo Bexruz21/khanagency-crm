@@ -94,10 +94,6 @@ onMounted(load)
 
     <div v-else class="card table-wrap rise">
       <table>
-        <colgroup>
-          <col class="col-task" /><col class="col-brand" /><col class="col-assignee" />
-          <col class="col-deadline" /><col class="col-completed" /><col class="col-priority" /><col class="col-result" />
-        </colgroup>
         <thead>
           <tr>
             <th>Задача</th><th>Бренд</th><th>Исполнитель</th>
@@ -122,7 +118,7 @@ onMounted(load)
               {{ task.coins_result ? Number(task.coins_result).toLocaleString('ru-RU') : '—' }}
             </td>
           </tr>
-          <tr v-if="!items.length"><td colspan="7" class="empty">В архиве нет задач по выбранным фильтрам</td></tr>
+          <tr v-if="!items.length" class="empty-row"><td class="empty">В архиве нет задач по выбранным фильтрам</td></tr>
         </tbody>
       </table>
     </div>
@@ -206,12 +202,20 @@ onMounted(load)
 .filters.employee { grid-template-columns: repeat(3, minmax(145px, 1fr)) auto; }
 .reset { white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
-table { width: 100%; min-width: 1120px; table-layout: fixed; border-collapse: collapse; font-size: 0.88rem; }
-.col-task { width: 270px; }
-.col-brand { width: 140px; }
-.col-assignee { width: 200px; }
-.col-deadline, .col-completed { width: 145px; }
-.col-priority, .col-result { width: 110px; }
+table {
+  --archive-columns: minmax(220px, 2fr) minmax(120px, 0.9fr) minmax(190px, 1.35fr) 145px 145px 115px 105px;
+  display: block;
+  width: 100%;
+  min-width: 1080px;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+thead, tbody { display: block; width: 100%; }
+thead tr, tbody tr {
+  display: grid;
+  grid-template-columns: var(--archive-columns);
+  width: 100%;
+}
 th {
   text-align: left; color: var(--muted); font-size: 0.72rem; text-transform: uppercase;
   letter-spacing: 0.05em; padding: 12px 14px; border-bottom: 1px solid var(--line); white-space: nowrap;
@@ -228,7 +232,8 @@ tbody tr:last-child td { border-bottom: 0; }
 .person > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .positive { color: var(--green); font-weight: 650; }
 .negative { color: var(--red); font-weight: 650; }
-.empty { text-align: center; color: var(--muted); padding: 36px !important; }
+.empty-row { grid-template-columns: minmax(0, 1fr); }
+.empty { grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 36px !important; }
 .detail-body { display: flex; flex-direction: column; gap: 22px; }
 .detail-statuses { display: flex; gap: 8px; flex-wrap: wrap; }
 .detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }

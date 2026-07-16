@@ -96,11 +96,19 @@ async function runResearch() {
   researching.value = true
   researchError.value = ''
   try {
-    const { data } = await api.post(`/brands/${brand.value.id}/research/`, { search_hint: searchHint.value })
+    const { data } = await api.post(
+      `/brands/${brand.value.id}/research/`,
+      { search_hint: searchHint.value },
+      { timeout: 240000 },
+    )
     researchDraft.value = data.draft
     researchSources.value = data.sources || []
   } catch (error) {
-    researchError.value = error.response?.data?.detail || 'Не удалось выполнить поиск. Попробуйте уточнить сайт или Instagram бренда.'
+    const timedOut = ['ECONNABORTED', 'ETIMEDOUT'].includes(error.code)
+      || /timeout/i.test(error.message || '')
+    researchError.value = timedOut
+      ? 'Поиск занял слишком много времени. Вы остались в аккаунте — попробуйте ещё раз или укажите точный сайт бренда.'
+      : error.response?.data?.detail || 'Не удалось выполнить поиск. Попробуйте уточнить сайт или Instagram бренда.'
   } finally {
     researching.value = false
   }

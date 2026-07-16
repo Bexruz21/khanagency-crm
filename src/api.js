@@ -73,8 +73,13 @@ api.interceptors.response.use(
       }
     }
 
-    // Нет ответа — backend/ngrok недоступен. 401 без refresh — сессия недействительна.
-    if ((unauthorized || !error.response) && !axios.isCancel(error)) clearAuthSession()
+    const timedOut = ['ECONNABORTED', 'ETIMEDOUT'].includes(error.code)
+      || /timeout/i.test(error.message || '')
+    const networkUnavailable = !error.response && !timedOut && !axios.isCancel(error)
+
+    // Таймаут отдельного долгого запроса не означает, что сессия недействительна.
+    // Выходим только при настоящем 401 или когда соединение с backend оборвалось.
+    if (unauthorized || networkUnavailable) clearAuthSession()
     return Promise.reject(error)
   },
 )
