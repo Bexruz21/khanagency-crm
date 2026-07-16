@@ -109,49 +109,49 @@ function toggleMember(id) {
 
           <div class="info-grid">
             <div class="info-item">
-              <span class="info-icon" style="--tone: #7c3aed; --tone-bg: #f1eafd">
+              <span class="info-icon" style="--tone: var(--violet); --tone-bg: var(--violet-soft)">
                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 4 7v10l8 5 8-5V7l-8-5zm0 2.3L17.7 8 12 11.6 6.3 8 12 4.3zM6 9.9l5 3.1v6.6l-5-3.1V9.9zm12 6.6-5 3.1V13l5-3.1v6.6z"/></svg>
               </span>
               <div><span class="info-label">Ниша</span><span class="info-value">{{ brand.niche || '—' }}</span></div>
             </div>
 
             <div class="info-item">
-              <span class="info-icon" style="--tone: #4f46e5; --tone-bg: #eef0ff">
+              <span class="info-icon" style="--tone: var(--accent); --tone-bg: var(--accent-soft)">
                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 12c2.2 0 4-1.8 4-4s-1.8-4-4-4-4 1.8-4 4 1.8 4 4 4zm0 2c-2.7 0-8 1.3-8 4v2h16v-2c0-2.7-5.3-4-8-4z"/></svg>
               </span>
               <div><span class="info-label">Контактное лицо</span><span class="info-value">{{ brand.contact_name || '—' }}</span></div>
             </div>
 
             <div class="info-item">
-              <span class="info-icon" style="--tone: #0d9466; --tone-bg: #e4f7ef">
+              <span class="info-icon" style="--tone: var(--green); --tone-bg: var(--green-soft)">
                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.3 0 .7-.2 1l-2.3 2.2z"/></svg>
               </span>
               <div><span class="info-label">Телефон</span><span class="info-value">{{ brand.contact_phone || '—' }}</span></div>
             </div>
 
             <div class="info-item">
-              <span class="info-icon" style="--tone: #0369a1; --tone-bg: #e3f3fc">
+              <span class="info-icon" style="--tone: var(--sky); --tone-bg: var(--sky-soft)">
                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>
               </span>
               <div><span class="info-label">Email</span><span class="info-value">{{ brand.contact_email || '—' }}</span></div>
             </div>
 
             <div class="info-item">
-              <span class="info-icon" style="--tone: #b45309; --tone-bg: #fdf1de">
+              <span class="info-icon" style="--tone: var(--amber); --tone-bg: var(--amber-soft)">
                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm1 15h-2v-1.1c-1.5-.3-2.7-1.2-2.8-2.8h1.9c.1.7.6 1.3 1.9 1.3 1.4 0 1.7-.7 1.7-1.1 0-.6-.3-1.1-1.9-1.5-1.8-.4-3.4-1.1-3.4-3 0-1.4 1.1-2.3 2.6-2.7V5h2v1.2c1.6.4 2.4 1.6 2.5 2.8h-1.9c0-.7-.4-1.3-1.6-1.3-1.1 0-1.6.5-1.6 1.1 0 .5.4.9 1.9 1.3 1.6.4 3.4 1 3.4 3.1 0 1.5-1.1 2.4-2.7 2.7V17z"/></svg>
               </span>
               <div><span class="info-label">Бюджет</span><span class="info-value">{{ fmtMoney(brand.budget) }}</span></div>
             </div>
 
             <div class="info-item">
-              <span class="info-icon" style="--tone: #ec4899; --tone-bg: #fce9f3">
+              <span class="info-icon" style="--tone: var(--violet); --tone-bg: var(--violet-soft)">
                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5zm3 5h3v3H8v-3z"/></svg>
               </span>
               <div><span class="info-label">Дата начала</span><span class="info-value">{{ fmtDate(brand.start_date) }}</span></div>
             </div>
 
             <div class="info-item">
-              <span class="info-icon" style="--tone: #dc2626; --tone-bg: #fdeaea">
+              <span class="info-icon" style="--tone: var(--red); --tone-bg: var(--red-soft)">
                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
               </span>
               <div>
@@ -164,7 +164,7 @@ function toggleMember(id) {
             </div>
 
             <div class="info-item">
-              <span class="info-icon" style="--tone: #4f46e5; --tone-bg: #eef0ff">
+              <span class="info-icon" style="--tone: var(--accent); --tone-bg: var(--accent-soft)">
                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M13 3a9 9 0 1 0 8.9 10.5c.1-.6-.4-1-.9-1s-.9.5-1 1A7 7 0 1 1 13 5v3l4.5-4L13 0v3z"/></svg>
               </span>
               <div><span class="info-label">Статус проекта</span><span class="info-value"><StatusBadge :map="BRAND_STATUS" :value="brand.status" /></span></div>
@@ -301,7 +301,7 @@ function toggleMember(id) {
   transition: background-color var(--dur-fast) ease;
 }
 @media (hover: hover) and (pointer: fine) {
-  .info-item:hover { background: rgb(20 20 40 / 0.03); }
+  .info-item:hover { background: var(--sunken); }
 }
 .info-icon {
   width: 36px; height: 36px;
@@ -346,4 +346,23 @@ function toggleMember(id) {
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 @media (max-width: 900px) { .overview { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .head { align-items: stretch; flex-direction: column; gap: 12px; }
+  .head-actions { justify-content: space-between; }
+  .tabs {
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 0 0 auto; min-height: 40px; padding-inline: 14px; }
+  .overview { gap: 10px; }
+  .panel { padding: 16px; }
+  .info-grid { gap: 4px; }
+  .info-item { padding-inline: 4px; }
+  .row2 { grid-template-columns: 1fr; }
+  .chip { min-height: 38px; }
+}
 </style>

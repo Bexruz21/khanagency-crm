@@ -322,7 +322,7 @@ td { padding: 11px 14px; border-bottom: 1px solid var(--line); white-space: nowr
 tbody tr { cursor: pointer; transition: background-color var(--dur-fast) ease; }
 tbody tr:last-child td { border-bottom: 0; }
 @media (hover: hover) and (pointer: fine) {
-  tbody tr:hover { background: rgb(20 20 40 / 0.03); }
+  tbody tr:hover { background: var(--sunken); }
 }
 .title-cell { font-weight: 600; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
 .ai-dot { color: var(--violet); margin-right: 3px; }
@@ -401,7 +401,7 @@ tbody tr:last-child td { border-bottom: 0; }
 }
 .idea p { color: var(--ink-2); font-size: 0.83rem; margin-top: 3px; }
 @media (hover: hover) and (pointer: fine) {
-  .idea:hover { border-color: var(--accent); background: rgb(79 70 229 / 0.03); }
+  .idea:hover { border-color: var(--accent); background: var(--accent-soft); }
 }
 
 .error { color: var(--red); font-size: 0.85rem; margin-top: 10px; }
@@ -413,4 +413,18 @@ tbody tr:last-child td { border-bottom: 0; }
   animation: spin 600ms linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 640px) {
+  .toolbar { align-items: stretch; flex-direction: column; }
+  .toolbar .select { width: 100% !important; }
+  .actions { flex-wrap: wrap; }
+  .actions .btn { flex: 1 1 auto; }
+  .row2, .row3 { grid-template-columns: 1fr; }
+  .prio-row { align-items: stretch; flex-direction: column; }
+  .mode-switch { width: 100%; }
+  .mode-switch button { flex: 1; min-height: 40px; }
+  .chip { min-height: 40px; }
+  .idea { padding: 12px; }
+  .idea .fmt { display: inline-block; margin: 4px 0 0; }
+}
 </style>

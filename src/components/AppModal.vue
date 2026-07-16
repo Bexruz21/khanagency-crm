@@ -29,8 +29,9 @@ const emit = defineEmits(['close'])
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgb(18 18 32 / 0.45);
-  backdrop-filter: blur(3px);
+  background: rgb(0 0 0 / 0.32);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -43,6 +44,9 @@ const emit = defineEmits(['close'])
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-lg);
+  background: var(--surface-raised);
+  backdrop-filter: blur(36px) saturate(180%);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
   /* модалка не привязана к триггеру — origin остаётся center */
 }
 header {
@@ -50,15 +54,38 @@ header {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0.5px solid var(--line);
 }
-h3 { font-size: 1.05rem; }
+h3 { font-size: 1.08rem; font-weight: 650; }
 .body { padding: 18px 20px; overflow-y: auto; }
 footer {
   padding: 12px 20px 16px;
-  border-top: 1px solid var(--line);
+  border-top: 0.5px solid var(--line);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .overlay { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .modal-box { background: var(--surface-solid); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+@media (max-width: 640px) {
+  .overlay { align-items: flex-end; padding: 0; }
+  .modal-box {
+    max-width: none !important;
+    max-height: calc(94dvh - env(safe-area-inset-top));
+    border-radius: 22px 22px 0 0;
+    border-bottom: 0;
+  }
+  header { min-height: 56px; padding: 12px 14px 10px 18px; }
+  header .btn { width: 40px; min-height: 40px; padding: 0; justify-content: center; }
+  .body { padding: 16px 18px; }
+  footer {
+    padding: 12px 18px calc(14px + env(safe-area-inset-bottom));
+    flex-wrap: wrap;
+  }
+  footer :deep(.btn) { min-height: 44px; }
 }
 </style>

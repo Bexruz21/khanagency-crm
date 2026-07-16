@@ -158,7 +158,7 @@ h3 { font-size: 1.08rem; }
 }
 
 .progress { height: 6px; border-radius: 4px; background: var(--line); overflow: hidden; }
-.progress .bar { height: 100%; background: linear-gradient(90deg, var(--accent), #7c6cf5); border-radius: 4px; }
+.progress .bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--sky)); border-radius: 4px; }
 .meta { display: flex; gap: 12px; font-size: 0.79rem; color: var(--muted); margin: 8px 0 14px; }
 .overdue { color: var(--red); font-weight: 600; }
 .budget { margin-left: auto; }
@@ -184,4 +184,15 @@ h3 { font-size: 1.08rem; }
 }
 .chip:active { transform: scale(0.95); }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+@media (max-width: 640px) {
+  .head { align-items: stretch; flex-direction: column; }
+  .head .btn { width: 100%; }
+  .cards { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .brand-card { padding: 16px; }
+  .meta { flex-wrap: wrap; gap: 6px 12px; }
+  .budget { width: 100%; margin-left: 0; }
+  .row2 { grid-template-columns: 1fr; }
+  .chip { min-height: 38px; }
+}
 </style>

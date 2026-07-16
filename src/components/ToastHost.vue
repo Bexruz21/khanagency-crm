@@ -7,7 +7,7 @@ const router = useRouter()
 
 const KIND = {
   info: { icon: 'ℹ️', bar: 'var(--accent)' },
-  warning: { icon: '⏰', bar: '#f59e0b' },
+  warning: { icon: '⏰', bar: 'var(--amber)' },
   danger: { icon: '🔴', bar: 'var(--red)' },
   success: { icon: '✓', bar: 'var(--green)' },
 }
@@ -55,12 +55,14 @@ function open(t) {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--bar);
-  border-radius: 12px;
+  background: var(--surface-raised);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 0.5px solid var(--line);
+  border-left: 3px solid var(--bar);
+  border-radius: 16px;
   box-shadow: var(--shadow-lg);
-  padding: 12px 14px;
+  padding: 13px 14px;
   /* transitions, а не keyframes: toast'ы приходят пачками — важна interruptibility */
   transition: transform 240ms var(--ease-drawer), opacity 200ms var(--ease-out);
 }
@@ -85,7 +87,11 @@ p { flex: 1; font-size: 0.88rem; line-height: 1.4; font-weight: 500; }
   transition: color var(--dur-fast) ease, background-color var(--dur-fast) ease;
 }
 @media (hover: hover) and (pointer: fine) {
-  .x:hover { color: var(--ink); background: rgb(20 20 40 / 0.06); }
+  .x:hover { color: var(--ink); background: var(--sunken); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .toast { background: var(--surface-solid); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
 /* вход справа с лёгким scale (не от 0!), выход быстрее входа */
@@ -96,5 +102,15 @@ p { flex: 1; font-size: 0.88rem; line-height: 1.4; font-weight: 500; }
 
 @media (prefers-reduced-motion: reduce) {
   .toast-enter-from, .toast-leave-to { transform: none; }
+}
+
+@media (max-width: 640px) {
+  .toast-zone {
+    top: calc(10px + env(safe-area-inset-top));
+    right: 10px;
+    width: calc(100vw - 20px);
+  }
+  .toast { min-height: 52px; align-items: center; }
+  .x { width: 36px; height: 36px; display: grid; place-items: center; }
 }
 </style>

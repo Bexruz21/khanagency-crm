@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import api from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
 import { PRIORITY, TASK_STATUS, fmtDate } from '../labels'
@@ -7,11 +7,20 @@ import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const data = ref(null)
+let refreshTimer = null
 
-onMounted(async () => {
+async function load() {
   const res = await api.get('/tasks/my-stats/')
   data.value = res.data
+}
+
+onMounted(async () => {
+  await load()
+  refreshTimer = setInterval(() => {
+    if (!document.hidden) load()
+  }, 10000)
 })
+onUnmounted(() => clearInterval(refreshTimer))
 
 const cards = [
   { key: 'active', label: 'Активных задач', tone: 'accent' },
@@ -120,8 +129,8 @@ const cards = [
 .stat .num { font-size: 1.9rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .stat .lbl { color: var(--muted); font-size: 0.85rem; font-weight: 600; }
 .stat.accent { border-left-color: var(--accent); }
-.stat.violet { border-left-color: #8b5cf6; }
-.stat.green { border-left-color: #10b981; }
+.stat.violet { border-left-color: var(--violet); }
+.stat.green { border-left-color: var(--green); }
 .stat.red { border-left-color: var(--red); }
 .stat.coins { border-left-color: var(--amber); background: color-mix(in srgb, var(--amber) 7%, var(--surface)); }
 .stat.coins .num { color: var(--amber); }
@@ -150,7 +159,7 @@ const cards = [
 }
 .trow.link { transition: background-color var(--dur-fast) ease; }
 @media (hover: hover) and (pointer: fine) {
-  .trow.link:hover { background: rgb(20 20 40 / 0.04); }
+  .trow.link:hover { background: var(--sunken); }
 }
 .tinfo { flex: 1; min-width: 0; line-height: 1.3; }
 .tinfo strong { display: block; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -160,4 +169,16 @@ const cards = [
 .empty { color: var(--muted); font-size: 0.88rem; padding: 8px; }
 
 @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .stat { padding: 14px 15px; border-left-width: 3px; }
+  .stat .num { font-size: 1.55rem; }
+  .stat .lbl { font-size: 0.76rem; line-height: 1.25; }
+  .grid { gap: 10px; }
+  .panel { padding: 14px; }
+  .perf-ring { gap: 14px; }
+  .trow { gap: 9px; padding: 11px 4px; }
+  .trow .badge { display: none; }
+  .deadline { font-size: 0.75rem; }
+}
 </style>

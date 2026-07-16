@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import api from '../api'
 import UserAvatar from '../components/UserAvatar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -10,13 +10,22 @@ import { useAuthStore } from '../stores/auth'
 const auth = useAuthStore()
 const data = ref(null)
 const isEmployee = computed(() => auth.user?.role === 'employee')
+let refreshTimer = null
 
-onMounted(async () => {
+async function load() {
   if (!auth.user) await auth.fetchMe()
   if (isEmployee.value) return // у сотрудника свой дашборд
   const res = await api.get('/tasks/dashboard/')
   data.value = res.data
+}
+
+onMounted(async () => {
+  await load()
+  if (!isEmployee.value) refreshTimer = setInterval(() => {
+    if (!document.hidden) load()
+  }, 10000)
 })
+onUnmounted(() => clearInterval(refreshTimer))
 
 const statCards = [
   { key: 'brands_active', label: 'Проектов в работе', tone: 'accent' },
@@ -145,8 +154,8 @@ export default { components: { TaskRow } }
 .stat .num { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .stat .lbl { color: var(--muted); font-size: 0.85rem; font-weight: 600; }
 .stat.accent { border-left-color: var(--accent); }
-.stat.sky { border-left-color: #0ea5e9; }
-.stat.amber { border-left-color: #f59e0b; }
+.stat.sky { border-left-color: var(--sky); }
+.stat.amber { border-left-color: var(--amber); }
 .stat.red { border-left-color: var(--red); }
 
 .grid {
@@ -176,7 +185,7 @@ export default { components: { TaskRow } }
   transition: background-color var(--dur-fast) ease;
 }
 @media (hover: hover) and (pointer: fine) {
-  .brand-row:hover, .task-row:hover { background: rgb(20 20 40 / 0.04); }
+  .brand-row:hover, .task-row:hover { background: var(--sunken); }
 }
 .brand-info { flex: 1; min-width: 0; line-height: 1.3; }
 .brand-info strong { display: block; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -187,7 +196,7 @@ export default { components: { TaskRow } }
 .progress .bar {
   height: 100%;
   border-radius: 4px;
-  background: linear-gradient(90deg, var(--accent), #7c6cf5);
+  background: linear-gradient(90deg, var(--accent), var(--sky));
   transition: width 500ms var(--ease-in-out);
 }
 .pct { font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; width: 34px; text-align: right; }
@@ -197,5 +206,17 @@ export default { components: { TaskRow } }
 
 @media (max-width: 900px) {
   .grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .stat { padding: 14px 15px; border-left-width: 3px; }
+  .stat .num { font-size: 1.55rem; }
+  .stat .lbl { font-size: 0.76rem; line-height: 1.25; }
+  .grid { gap: 10px; }
+  .panel { padding: 14px; }
+  .brand-row, .team-row, .task-row { gap: 9px; padding: 11px 4px; }
+  .progress-wrap { width: 92px; }
+  .task-row .badge { display: none; }
+  .deadline { font-size: 0.75rem; }
 }
 </style>

@@ -1,11 +1,13 @@
 import { defineStore } from 'pinia'
-import axios from 'axios'
-import api from '../api'
+import api, { clearAuthSession, publicApi } from '../api'
+
+let sessionPromise = null
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
     loading: false,
+    initialized: false,
     error: '',
   }),
   getters: {
@@ -17,7 +19,7 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true
       this.error = ''
       try {
-        const { data } = await axios.post('/api/auth/token/', { username, password })
+        const { data } = await publicApi.post('/auth/token/', { username, password })
         localStorage.setItem('khan_access', data.access)
         localStorage.setItem('khan_refresh', data.refresh)
         await this.fetchMe()
@@ -29,17 +31,34 @@ export const useAuthStore = defineStore('auth', {
         return false
       } finally {
         this.loading = false
+        this.initialized = true
       }
     },
     async fetchMe() {
       const { data } = await api.get('/users/me/')
       this.user = data
+      this.initialized = true
+    },
+    async ensureSession() {
+      if (this.user) {
+        this.initialized = true
+        return this.user
+      }
+      if (!localStorage.getItem('khan_access')) {
+        this.initialized = true
+        throw new Error('No access token')
+      }
+      if (!sessionPromise) {
+        sessionPromise = this.fetchMe().finally(() => {
+          sessionPromise = null
+        })
+      }
+      return sessionPromise
     },
     logout() {
-      localStorage.removeItem('khan_access')
-      localStorage.removeItem('khan_refresh')
       this.user = null
-      window.location.href = '/login'
+      this.initialized = true
+      clearAuthSession()
     },
   },
 })

@@ -37,9 +37,8 @@ async function pollNotifications() {
 }
 
 onMounted(() => {
-  if (auth.isAuthed && !auth.user) auth.fetchMe().catch(() => {})
   pollNotifications()
-  pollTimer = setInterval(pollNotifications, 30000)
+  pollTimer = setInterval(pollNotifications, 10000)
 })
 onUnmounted(() => clearInterval(pollTimer))
 
@@ -84,7 +83,7 @@ function isActive(item) {
     <RouterView />
   </div>
 
-  <div v-else class="shell">
+  <div v-else-if="auth.initialized && auth.user" class="shell">
     <aside class="sidebar" :class="{ collapsed }">
       <div class="top-row">
         <RouterLink to="/" class="logo">
@@ -116,7 +115,7 @@ function isActive(item) {
             <span>{{ ROLE[auth.user.role] }}</span>
           </div>
         </RouterLink>
-        <button class="logout label" title="Выйти" @click="auth.logout()">
+        <button class="logout label" title="Выйти" aria-label="Выйти" @click="auth.logout()">
           <svg viewBox="0 0 24 24" width="17" height="17"><path fill="currentColor" d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
         </button>
       </div>
@@ -150,14 +149,13 @@ function isActive(item) {
   flex-direction: column;
   gap: 4px;
   padding: 16px 12px;
-  border-radius: 22px;
-  /* полупрозрачный «материал» в духе Apple */
-  background: rgb(20 20 31 / 0.92);
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
-  border: 1px solid rgb(255 255 255 / 0.07);
-  box-shadow: 0 12px 34px rgb(10 10 25 / 0.25), 0 2px 8px rgb(10 10 25 / 0.12);
-  color: #b9b9cc;
+  border-radius: 24px;
+  background: rgb(29 29 31 / 0.86);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border: 0.5px solid rgb(255 255 255 / 0.14);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 0.24), 0 4px 16px rgb(0 0 0 / 0.12), inset 0 0.5px rgb(255 255 255 / 0.16);
+  color: rgb(235 235 245 / 0.68);
   transition: width 260ms var(--ease-drawer), padding 260ms var(--ease-drawer);
   overflow: hidden;
 }
@@ -191,19 +189,20 @@ function isActive(item) {
 
 .collapse-btn {
   border: 0;
-  background: rgb(255 255 255 / 0.07);
-  color: #b9b9cc;
+  background: rgb(118 118 128 / 0.2);
+  color: rgb(235 235 245 / 0.72);
   width: 28px; height: 28px;
-  border-radius: 8px;
+  border-radius: 9px;
   cursor: pointer;
   display: grid;
   place-items: center;
   flex: none;
   transition: background-color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
 }
+.collapse-btn svg, .nav-item svg, .logout svg { display: block; }
 .collapse-btn:active { transform: scale(0.92); }
 @media (hover: hover) and (pointer: fine) {
-  .collapse-btn:hover { background: rgb(255 255 255 / 0.14); color: #fff; }
+  .collapse-btn:hover { background: rgb(118 118 128 / 0.32); color: #fff; }
 }
 
 nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
@@ -213,10 +212,10 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
   align-items: center;
   gap: 11px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 11px;
   color: inherit;
   text-decoration: none;
-  font-weight: 600;
+  font-weight: 560;
   font-size: 0.93rem;
   transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease,
               transform var(--dur-press) var(--ease-out);
@@ -224,9 +223,10 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .collapsed .nav-item { justify-content: center; gap: 0; padding: 11px 0; width: 46px; margin-inline: auto; }
 .nav-item svg { flex: none; }
 .nav-item:active { transform: scale(0.97); }
-.nav-item.active { background: rgb(255 255 255 / 0.09); color: #fff; }
+.nav-item.active { background: rgb(10 132 255 / 0.92); color: #fff; box-shadow: 0 4px 14px rgb(0 122 255 / 0.24), inset 0 0.5px rgb(255 255 255 / 0.22); }
 @media (hover: hover) and (pointer: fine) {
-  .nav-item:hover { background: rgb(255 255 255 / 0.06); color: #fff; }
+  .nav-item:hover { background: rgb(118 118 128 / 0.16); color: #fff; }
+  .nav-item.active:hover { background: #0a84ff; }
 }
 
 .sidebar-user {
@@ -234,7 +234,7 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
   align-items: center;
   gap: 6px;
   padding: 10px 2px 0;
-  border-top: 1px solid rgb(255 255 255 / 0.08);
+  border-top: 0.5px solid rgb(255 255 255 / 0.14);
 }
 .collapsed .sidebar-user { justify-content: center; padding: 10px 0 0; }
 .user-link {
@@ -251,28 +251,99 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 }
 .collapsed .user-link { flex: none; padding: 0; }
 @media (hover: hover) and (pointer: fine) {
-  .user-link:hover { background: rgb(255 255 255 / 0.06); }
+  .user-link:hover { background: rgb(118 118 128 / 0.15); }
 }
 .who { flex: 1; min-width: 0; line-height: 1.25; }
 .who strong { display: block; color: #fff; font-size: 0.87rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.who span { font-size: 0.75rem; color: #8d8da5; }
+.who span { font-size: 0.75rem; color: rgb(235 235 245 / 0.48); }
 .logout {
   border: 0;
   background: transparent;
-  color: #8d8da5;
+  color: rgb(235 235 245 / 0.48);
   cursor: pointer;
-  padding: 6px;
-  border-radius: 8px;
+  padding: 0;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  line-height: 0;
   transition: color var(--dur-fast) ease, background-color var(--dur-fast) ease;
 }
 @media (hover: hover) and (pointer: fine) {
-  .logout:hover { color: #fff; background: rgb(255 255 255 / 0.08); }
+  .logout:hover { color: #fff; background: rgb(118 118 128 / 0.18); }
 }
 
 .content {
   overflow-y: auto;
   padding: 14px 32px 48px 26px;
   min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .shell { display: block; height: 100%; padding: 0; }
+  .content {
+    height: 100%;
+    padding: 18px 14px calc(100px + env(safe-area-inset-bottom));
+    overscroll-behavior-y: contain;
+  }
+  .sidebar,
+  .sidebar.collapsed {
+    position: fixed;
+    z-index: 80;
+    left: 10px;
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    width: auto;
+    height: 68px;
+    padding: 7px 8px;
+    border-radius: 21px;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    overflow: visible;
+  }
+  .top-row { display: none; }
+  nav { flex-direction: row; min-width: 0; gap: 2px; }
+  .nav-item,
+  .collapsed .nav-item {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    min-height: 52px;
+    margin: 0;
+    padding: 5px 2px 4px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    border-radius: 14px;
+    font-size: 0.67rem;
+    line-height: 1.1;
+  }
+  .nav-item svg { width: 21px; height: 21px; }
+  .collapsed .nav-item .label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .sidebar-user,
+  .collapsed .sidebar-user {
+    flex: 0 0 auto;
+    justify-content: center;
+    padding: 0 0 0 3px;
+    border: 0;
+  }
+  .user-link { display: none; }
+  .logout,
+  .collapsed .logout {
+    display: grid;
+    width: 46px;
+    height: 52px;
+    flex-basis: 46px;
+    border-radius: 14px;
+  }
+  .logout svg { width: 21px; height: 21px; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .sidebar { background: #1c1c1e; backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

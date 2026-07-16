@@ -222,4 +222,20 @@ async function save() {
 .error { color: var(--red); font-size: 0.85rem; }
 .foot { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
 .saved { color: var(--green); font-weight: 600; font-size: 0.9rem; }
+
+@media (max-width: 640px) {
+  .head { padding: 18px; gap: 14px; }
+  .theme-card { padding: 16px 18px; align-items: stretch; flex-direction: column; }
+  .theme-switch { width: 100%; }
+  .theme-opt { flex: 1; justify-content: center; padding-inline: 8px; min-height: 42px; }
+  .form { padding: 18px; }
+  .row2 { grid-template-columns: 1fr; }
+  .tg-row { flex-direction: column; }
+  .tg-row .btn { width: 100%; }
+  .colors { flex-wrap: wrap; gap: 12px; }
+  .color { width: 32px; height: 32px; }
+  .foot { align-items: stretch; flex-direction: column; }
+  .foot .btn { width: 100%; }
+  .saved { text-align: center; }
+}
 </style>

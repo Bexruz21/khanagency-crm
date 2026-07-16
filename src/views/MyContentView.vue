@@ -100,4 +100,12 @@ tbody tr:last-child td { border-bottom: 0; }
   border: 0; border-radius: 99px; padding: 4px 10px;
   font-size: 0.78rem; font-weight: 600; cursor: pointer; appearance: none; outline: none;
 }
+
+@media (max-width: 640px) {
+  .head { align-items: stretch; flex-direction: column; }
+  .head .select { width: 100% !important; }
+  .table-wrap { margin-inline: -1px; border-radius: var(--radius); }
+  th, td { padding-inline: 12px; }
+  .status-select { min-height: 36px; }
+}
 </style>

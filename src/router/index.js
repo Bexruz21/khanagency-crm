@@ -18,17 +18,24 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  const authed = !!localStorage.getItem('khan_access')
-  if (!to.meta.public && !authed) return { name: 'login' }
-  if (to.name === 'login' && authed) return { name: 'dashboard' }
+  const hasToken = !!localStorage.getItem('khan_access')
+  const auth = useAuthStore()
 
-  if (to.meta.managerOnly && authed) {
-    const auth = useAuthStore()
-    if (!auth.user) {
-      try { await auth.fetchMe() } catch { return { name: 'login' } }
-    }
-    if (auth.user?.role === 'employee') return { name: 'dashboard' }
+  if (!hasToken) {
+    auth.initialized = true
+    if (!to.meta.public) return { name: 'login' }
+    return true
   }
+
+  try {
+    await auth.ensureSession()
+  } catch {
+    return to.name === 'login' ? true : { name: 'login' }
+  }
+
+  if (to.name === 'login') return { name: 'dashboard' }
+  if (to.meta.managerOnly && auth.user?.role === 'employee') return { name: 'dashboard' }
+  return true
 })
 
 export default router

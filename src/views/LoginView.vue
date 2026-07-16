@@ -39,7 +39,6 @@ async function submit() {
       <button class="btn login-btn" :disabled="auth.loading">
         {{ auth.loading ? 'Входим…' : 'Войти' }}
       </button>
-      <p class="hint">демо: admin / admin123</p>
     </form>
   </div>
 </template>
@@ -50,8 +49,8 @@ async function submit() {
   display: grid;
   place-items: center;
   background:
-    radial-gradient(600px 400px at 20% 10%, rgb(79 70 229 / 0.14), transparent),
-    radial-gradient(500px 400px at 85% 90%, rgb(124 108 245 / 0.12), transparent),
+    radial-gradient(600px 400px at 20% 10%, rgb(0 122 255 / 0.16), transparent),
+    radial-gradient(500px 400px at 85% 90%, rgb(90 200 250 / 0.13), transparent),
     var(--bg);
   padding: 24px;
 }
@@ -61,6 +60,9 @@ async function submit() {
   padding: 34px 32px 26px;
   text-align: center;
   box-shadow: var(--shadow-lg);
+  background: var(--surface-raised);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
   opacity: 0;
   transform: translateY(10px) scale(0.985);
   animation: rise 280ms var(--ease-out) 60ms forwards;
@@ -72,16 +74,19 @@ async function submit() {
   font-family: -apple-system, 'SF Pro Display', 'Segoe UI Variable Display',
     'Segoe UI', system-ui, sans-serif;
   font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.024em; /* крупный текст — плотнее, как у Apple */
+  font-weight: 720;
+  letter-spacing: -0.035em;
 }
 .brand-sub {
   font-size: 0.62rem;
-  font-weight: 600;
+  font-weight: 650;
   letter-spacing: 0.32em;
   margin-left: 0.32em;
   color: var(--accent);
   margin-top: 3px;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .login-card { background: var(--surface-solid); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 .sub { color: var(--muted); font-size: 0.87rem; margin: 10px 0 22px; }
 label { text-align: left; }
@@ -98,5 +103,10 @@ label { text-align: left; }
 }
 @media (prefers-reduced-motion: reduce) {
   .shake { animation: none; }
+}
+@media (max-width: 480px) {
+  .login-page { padding: 14px; }
+  .login-card { padding: 28px 22px 22px; }
+  .login-btn { min-height: 46px; }
 }
 </style>

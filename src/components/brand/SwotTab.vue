@@ -125,10 +125,10 @@ async function save() {
 
 .quad { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .sec { padding: 16px 18px; border-top: 4px solid transparent; }
-.sec.green { border-top-color: #10b981; }
+.sec.green { border-top-color: var(--green); }
 .sec.red { border-top-color: var(--red); }
-.sec.sky { border-top-color: #0ea5e9; }
-.sec.amber { border-top-color: #f59e0b; }
+.sec.sky { border-top-color: var(--sky); }
+.sec.amber { border-top-color: var(--amber); }
 .sec h3 { font-size: 0.94rem; margin-bottom: 10px; }
 
 .items { position: relative; display: flex; flex-direction: column; gap: 7px; }
@@ -148,4 +148,13 @@ async function save() {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 900px) { .quad { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .empty-state { padding: 28px 18px; }
+  .actions { width: 100%; flex-direction: column; }
+  .toolbar { align-items: stretch; flex-direction: column; gap: 10px; }
+  .toolbar > div { display: flex; flex-wrap: wrap; gap: 8px; }
+  .quad { gap: 10px; }
+  .sec { padding: 14px; border-top-width: 3px; }
+  .item .btn { flex: 0 0 38px; width: 38px; min-height: 38px; padding: 0; }
+}
 </style>

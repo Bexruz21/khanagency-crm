@@ -12,9 +12,9 @@ defineProps({
     <svg :width="size" :height="size" viewBox="0 0 48 48" class="mark" aria-hidden="true">
       <defs>
         <linearGradient id="khan-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#6366f1" />
-          <stop offset="0.55" stop-color="#4f46e5" />
-          <stop offset="1" stop-color="#7c3aed" />
+          <stop offset="0" stop-color="#5ac8fa" />
+          <stop offset="0.55" stop-color="#0a84ff" />
+          <stop offset="1" stop-color="#0066cc" />
         </linearGradient>
         <linearGradient id="khan-shine" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stop-color="#ffffff" stop-opacity="0.22" />
@@ -44,7 +44,7 @@ defineProps({
 
 <style scoped>
 .khan-logo { display: inline-flex; align-items: center; gap: 11px; }
-.mark { flex: none; filter: drop-shadow(0 4px 10px rgb(79 70 229 / 0.35)); }
+.mark { flex: none; filter: drop-shadow(0 5px 12px rgb(0 122 255 / 0.28)); }
 
 .word { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
 /* типографика в духе Apple: SF Pro, плотный отрицательный трекинг у крупного текста */
@@ -66,5 +66,5 @@ defineProps({
   margin-top: 2px;
 }
 .light .khan { color: #fff; }
-.light .crm { color: #a5a1ff; }
+.light .crm { color: #64d2ff; }
 </style>

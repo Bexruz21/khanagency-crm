@@ -285,4 +285,20 @@ async function save() {
 .color:active { transform: scale(0.9); }
 .color.on { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
 .error { color: var(--red); font-size: 0.85rem; }
+
+@media (max-width: 640px) {
+  .head { align-items: stretch; flex-direction: column; }
+  .head .btn { width: 100%; }
+  .cards { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .person { padding: 16px; gap: 4px 10px; }
+  .contact { gap: 8px 12px; }
+  .more { width: 100%; margin-left: 0; }
+  .coin-hero { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .grid6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .monthly { gap: 6px; }
+  .tx { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .tx-amount { width: auto; }
+  .row2 { grid-template-columns: 1fr; }
+  .color { width: 32px; height: 32px; }
+}
 </style>

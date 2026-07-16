@@ -256,4 +256,15 @@ tr:last-child td { border-bottom: 0; }
 @media (max-width: 1000px) {
   .toolbar, .grid2 { grid-template-columns: 1fr; }
 }
+@media (max-width: 640px) {
+  .toolbar, .grid2 { gap: 10px; }
+  .ring-wrap { padding: 16px; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .stat { padding: 12px; }
+  .panel { padding: 16px; overflow-x: auto; }
+  .bar-row { gap: 8px; }
+  .bar-label { width: 84px; font-size: 0.78rem; }
+  .perf-table { min-width: 520px; }
+  .overdue-row { gap: 10px; }
+}
 </style>

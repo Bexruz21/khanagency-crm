@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import api, { downloadPdf } from '../api'
 import AppModal from '../components/AppModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -32,6 +32,8 @@ const form = reactive({ ...blank })
 const detail = ref(null)       // подробная задача
 const commentText = ref('')
 const fileInput = ref(null)
+let syncTimer = null
+let syncInFlight = false
 
 async function load() {
   const params = new URLSearchParams()
@@ -43,11 +45,34 @@ async function load() {
 
 onMounted(async () => {
   if (!auth.user) await auth.fetchMe()
-  const [u, b] = await Promise.all([api.get('/users/'), api.get('/brands/')])
-  users.value = u.data
-  brands.value = b.data
+  if (!isEmployee.value) {
+    const [u, b] = await Promise.all([api.get('/users/'), api.get('/brands/')])
+    users.value = u.data
+    brands.value = b.data
+  }
   await load()
+  syncTimer = setInterval(syncFromServer, 3000)
+  window.addEventListener('focus', syncFromServer)
 })
+
+onUnmounted(() => {
+  clearInterval(syncTimer)
+  window.removeEventListener('focus', syncFromServer)
+})
+
+async function syncFromServer() {
+  if (syncInFlight || document.hidden || createModal.value || saving.value) return
+  syncInFlight = true
+  try {
+    await load()
+    if (detail.value) {
+      const { data } = await api.get(`/tasks/${detail.value.id}/`)
+      detail.value = data
+    }
+  } finally {
+    syncInFlight = false
+  }
+}
 
 const byColumn = computed(() => {
   const map = { todo: [], in_progress: [], review: [], done: [] }
@@ -58,7 +83,7 @@ const byColumn = computed(() => {
 // --- drag & drop ---
 const dragId = ref(null)
 const dragOver = ref('')
-function onDrop(status) {
+async function onDrop(status) {
   // сотрудник двигает задачи только кнопками «Взять в работу» / «На проверку»
   if (isEmployee.value) return
   const task = tasks.value.find((t) => t.id === dragId.value)
@@ -66,7 +91,12 @@ function onDrop(status) {
   if (!task || task.status === status) return
   const prev = task.status
   task.status = status // оптимистично — интерфейс отвечает мгновенно
-  api.patch(`/tasks/${task.id}/`, { status }).catch(() => (task.status = prev))
+  try {
+    await api.patch(`/tasks/${task.id}/`, { status })
+    await load()
+  } catch {
+    task.status = prev
+  }
 }
 
 /** Кнопки workflow в карточке задачи */
@@ -453,5 +483,24 @@ function fileName(url) {
 .h-time { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 @media (max-width: 1100px) { .board { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 640px) { .board { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .head { align-items: stretch; }
+  .filters { width: 100%; flex-wrap: wrap; }
+  .filters .select { width: auto; flex: 1 1 150px; }
+  .filters .btn { flex: 1 1 auto; }
+  .board { grid-template-columns: 1fr; gap: 10px; }
+  .column { min-height: 120px; padding: 9px; }
+  .task { padding: 14px; }
+  .row2, .detail-controls { grid-template-columns: 1fr; }
+  .prio-row { align-items: stretch; flex-direction: column; }
+  .mode-switch { width: 100%; }
+  .mode-switch button { flex: 1; min-height: 40px; }
+  .workflow { align-items: stretch; padding: 12px; }
+  .workflow .btn { width: 100%; }
+  .workflow.manager .wf-note { width: 100%; }
+  .meta { line-height: 1.7; }
+  .comment-form .btn { width: 44px; padding-inline: 0; flex: 0 0 44px; }
+  .history li { flex-direction: column; gap: 1px; padding-block: 4px; }
+  .h-time { white-space: normal; }
+}
 </style>

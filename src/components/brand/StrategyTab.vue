@@ -162,4 +162,13 @@ async function save() {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .empty-state { padding: 28px 18px; }
+  .actions { width: 100%; flex-direction: column; }
+  .toolbar { align-items: stretch; flex-direction: column; gap: 10px; }
+  .toolbar > div { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cols, .col { gap: 10px; }
+  .sec { padding: 14px; }
+  .item .btn { flex: 0 0 38px; width: 38px; min-height: 38px; padding: 0; }
+}
 </style>
