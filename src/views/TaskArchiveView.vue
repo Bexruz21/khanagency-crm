@@ -94,6 +94,10 @@ onMounted(load)
 
     <div v-else class="card table-wrap rise">
       <table>
+        <colgroup>
+          <col class="col-task" /><col class="col-brand" /><col class="col-assignee" />
+          <col class="col-deadline" /><col class="col-completed" /><col class="col-priority" /><col class="col-result" />
+        </colgroup>
         <thead>
           <tr>
             <th>Задача</th><th>Бренд</th><th>Исполнитель</th>
@@ -202,20 +206,26 @@ onMounted(load)
 .filters.employee { grid-template-columns: repeat(3, minmax(145px, 1fr)) auto; }
 .reset { white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+table { width: 100%; min-width: 1120px; table-layout: fixed; border-collapse: collapse; font-size: 0.88rem; }
+.col-task { width: 270px; }
+.col-brand { width: 140px; }
+.col-assignee { width: 200px; }
+.col-deadline, .col-completed { width: 145px; }
+.col-priority, .col-result { width: 110px; }
 th {
   text-align: left; color: var(--muted); font-size: 0.72rem; text-transform: uppercase;
   letter-spacing: 0.05em; padding: 12px 14px; border-bottom: 1px solid var(--line); white-space: nowrap;
 }
-td { padding: 12px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 12px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .table-wrap th:nth-child(2), .table-wrap th:nth-child(3),
 .table-wrap td:nth-child(2), .table-wrap td:nth-child(3) { text-align: left; }
 .table-wrap .person { justify-content: flex-start; }
 tbody tr:last-child td { border-bottom: 0; }
 .task-row { cursor: pointer; transition: background 140ms ease; }
 .task-row:hover, .task-row:focus-visible { background: var(--sunken); outline: none; }
-.title-cell { font-weight: 650; min-width: 220px; white-space: normal; }
-.person { display: flex; align-items: center; gap: 8px; }
+.title-cell { font-weight: 650; white-space: normal; overflow-wrap: anywhere; }
+.person { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.person > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .positive { color: var(--green); font-weight: 650; }
 .negative { color: var(--red); font-weight: 650; }
 .empty { text-align: center; color: var(--muted); padding: 36px !important; }

@@ -30,6 +30,15 @@ const editModal = ref(false)
 const saving = ref(false)
 const form = reactive({})
 
+// --- подтверждаемое AI-исследование бренда ---
+const researchModal = ref(false)
+const researching = ref(false)
+const confirmingResearch = ref(false)
+const researchError = ref('')
+const searchHint = ref('')
+const researchDraft = ref(null)
+const researchSources = ref([])
+
 async function load() {
   const { data } = await api.get(`/brands/${route.params.id}/`)
   brand.value = data
@@ -73,6 +82,50 @@ function toggleMember(id) {
   const i = form.members.indexOf(id)
   i === -1 ? form.members.push(id) : form.members.splice(i, 1)
 }
+
+function openResearch() {
+  searchHint.value = [brand.value.research_data?.website, brand.value.contact_email].filter(Boolean).join(' · ')
+  const saved = brand.value.research_data && Object.keys(brand.value.research_data).length
+  researchDraft.value = saved ? JSON.parse(JSON.stringify(brand.value.research_data)) : null
+  researchSources.value = saved ? [...(brand.value.research_sources || [])] : []
+  researchError.value = ''
+  researchModal.value = true
+}
+
+async function runResearch() {
+  researching.value = true
+  researchError.value = ''
+  try {
+    const { data } = await api.post(`/brands/${brand.value.id}/research/`, { search_hint: searchHint.value })
+    researchDraft.value = data.draft
+    researchSources.value = data.sources || []
+  } catch (error) {
+    researchError.value = error.response?.data?.detail || 'Не удалось выполнить поиск. Попробуйте уточнить сайт или Instagram бренда.'
+  } finally {
+    researching.value = false
+  }
+}
+
+function setResearchList(key, value) {
+  researchDraft.value[key] = value.split('\n').map((item) => item.trim()).filter(Boolean)
+}
+
+async function confirmResearch() {
+  confirmingResearch.value = true
+  researchError.value = ''
+  try {
+    const { data } = await api.post(`/brands/${brand.value.id}/research/confirm/`, {
+      draft: researchDraft.value,
+      sources: researchSources.value,
+    })
+    brand.value = data
+    researchModal.value = false
+  } catch (error) {
+    researchError.value = error.response?.data?.detail || 'Не удалось сохранить подтверждённые данные.'
+  } finally {
+    confirmingResearch.value = false
+  }
+}
 </script>
 
 <template>
@@ -103,7 +156,13 @@ function toggleMember(id) {
     <Transition name="page" mode="out-in" :duration="{ enter: 260, leave: 140 }">
       <div v-if="tab === 'overview'" key="overview" class="overview">
         <div class="card panel">
-          <h2>О бренде</h2>
+          <div class="panel-heading">
+            <div>
+              <h2>О бренде</h2>
+              <span v-if="brand.researched_at" class="research-date">Данные проверены {{ fmtDate(brand.researched_at) }}</span>
+            </div>
+            <button class="btn soft sm" @click="openResearch">✦ {{ brand.researched_at ? 'Данные и поиск' : 'Найти данные' }}</button>
+          </div>
           <div class="desc-block">
             <p class="desc">{{ brand.description || 'Описание не заполнено — добавьте его: AI использует этот текст для SWOT и стратегии' }}</p>
           </div>
@@ -243,6 +302,96 @@ function toggleMember(id) {
         </button>
       </template>
     </AppModal>
+
+    <AppModal :open="researchModal" title="Поиск данных о бренде" width="820px" @close="researchModal = false">
+      <div v-if="!researchDraft" class="research-start">
+        <div class="research-hero">
+          <span class="research-icon">✦</span>
+          <div>
+            <h3>AI изучит открытые источники</h3>
+            <p>Будут проверены официальный сайт, социальные сети, каталоги и публикации. Результат появится как черновик на узбекском языке латиницей и не изменит бренд без вашего подтверждения.</p>
+          </div>
+        </div>
+        <label class="field">Сайт, Instagram или уточнение для поиска</label>
+        <textarea v-model="searchHint" class="textarea" rows="3" placeholder="Например: instagram.com/brand, Ташкент, магазин мужской одежды…" />
+        <p class="research-note">Чем точнее ссылка или город, тем меньше риск перепутать бренды с одинаковым названием.</p>
+        <p v-if="researchError" class="research-error">{{ researchError }}</p>
+      </div>
+
+      <div v-else class="research-review">
+        <div class="review-banner">
+          <div><strong>Проверьте найденные данные</strong><span>Отредактируйте любые поля и только затем подтвердите.</span></div>
+          <span class="confidence" :class="researchDraft.confidence">Точность: {{ researchDraft.confidence }}</span>
+        </div>
+
+        <section class="research-section">
+          <h3>Основная информация</h3>
+          <div class="row2">
+            <div><label class="field">Ниша</label><input v-model="researchDraft.niche" class="input" /></div>
+            <div><label class="field">География</label><input v-model="researchDraft.geography" class="input" /></div>
+          </div>
+          <div><label class="field">Краткое резюме</label><textarea v-model="researchDraft.summary" class="textarea" rows="3" /></div>
+          <div><label class="field">Подробное описание для SWOT и стратегии</label><textarea v-model="researchDraft.description" class="textarea" rows="7" /></div>
+        </section>
+
+        <section class="research-section">
+          <h3>Рынок и аудитория</h3>
+          <div><label class="field">Целевая аудитория</label><textarea v-model="researchDraft.target_audience" class="textarea" rows="4" /></div>
+          <div class="row2">
+            <div><label class="field">Позиционирование</label><textarea v-model="researchDraft.positioning" class="textarea" rows="3" /></div>
+            <div><label class="field">Ценовой сегмент</label><textarea v-model="researchDraft.price_segment" class="textarea" rows="3" /></div>
+          </div>
+          <div class="row2">
+            <div><label class="field">Товары и услуги — по одному в строке</label><textarea class="textarea" rows="5" :value="researchDraft.products_services.join('\n')" @input="setResearchList('products_services', $event.target.value)" /></div>
+            <div><label class="field">Конкуренты — по одному в строке</label><textarea class="textarea" rows="5" :value="researchDraft.competitors.join('\n')" @input="setResearchList('competitors', $event.target.value)" /></div>
+          </div>
+          <div><label class="field">Маркетинговые каналы — по одному в строке</label><textarea class="textarea" rows="4" :value="researchDraft.marketing_channels.join('\n')" @input="setResearchList('marketing_channels', $event.target.value)" /></div>
+        </section>
+
+        <section class="research-section">
+          <h3>Контакты и площадки</h3>
+          <div class="row2">
+            <div><label class="field">Сайт</label><input v-model="researchDraft.website" class="input" /></div>
+            <div><label class="field">Контактное лицо</label><input v-model="researchDraft.contact_name" class="input" /></div>
+          </div>
+          <div class="row2">
+            <div><label class="field">Телефон</label><input v-model="researchDraft.contact_phone" class="input" /></div>
+            <div><label class="field">Email</label><input v-model="researchDraft.contact_email" type="email" class="input" /></div>
+          </div>
+          <div><label class="field">Социальные сети — по одной ссылке в строке</label><textarea class="textarea" rows="4" :value="researchDraft.social_links.join('\n')" @input="setResearchList('social_links', $event.target.value)" /></div>
+        </section>
+
+        <section class="research-section">
+          <h3>Факты и ограничения исследования</h3>
+          <div class="row2">
+            <div><label class="field">Подтверждённые факты</label><textarea class="textarea" rows="5" :value="researchDraft.key_facts.join('\n')" @input="setResearchList('key_facts', $event.target.value)" /></div>
+            <div><label class="field">Что нужно проверить вручную</label><textarea class="textarea" rows="5" :value="researchDraft.caveats.join('\n')" @input="setResearchList('caveats', $event.target.value)" /></div>
+          </div>
+        </section>
+
+        <section class="research-section sources-section">
+          <h3>Источники ({{ researchSources.length }})</h3>
+          <div v-if="researchSources.length" class="source-list">
+            <a v-for="source in researchSources" :key="source.url" :href="source.url" target="_blank" rel="noopener">
+              <strong>{{ source.title }}</strong><span>{{ source.url }}</span><small v-if="source.cited_text">{{ source.cited_text }}</small>
+            </a>
+          </div>
+          <p v-else class="research-note">Claude не вернул ссылки. Перед подтверждением особенно внимательно проверьте данные.</p>
+        </section>
+        <p v-if="researchError" class="research-error">{{ researchError }}</p>
+      </div>
+
+      <template #footer>
+        <button class="btn outline" @click="researchModal = false">Отмена</button>
+        <button v-if="researchDraft" class="btn soft" :disabled="researching" @click="runResearch">{{ researching ? 'Ищем и проверяем…' : '↻ Найти заново' }}</button>
+        <button v-if="!researchDraft" class="btn" :disabled="researching" @click="runResearch">
+          <span v-if="researching" class="spinner" />{{ researching ? 'Ищем и проверяем…' : '✦ Начать поиск' }}
+        </button>
+        <button v-else class="btn" :disabled="confirmingResearch" @click="confirmResearch">
+          {{ confirmingResearch ? 'Сохраняем…' : 'Подтвердить данные' }}
+        </button>
+      </template>
+    </AppModal>
   </div>
 </template>
 
@@ -278,6 +427,9 @@ function toggleMember(id) {
 .overview { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; align-items: start; }
 .panel { padding: 18px 20px; }
 .panel h2 { font-size: 1.02rem; margin-bottom: 12px; }
+.panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.panel-heading h2 { margin-bottom: 2px; }
+.research-date { color: var(--green); font-size: 0.72rem; font-weight: 650; }
 
 .desc-block {
   background: var(--accent-soft);
@@ -346,6 +498,36 @@ function toggleMember(id) {
 .chip:active { transform: scale(0.95); }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 
+.research-start { display: flex; flex-direction: column; gap: 10px; }
+.research-hero { display: flex; gap: 13px; padding: 15px; margin-bottom: 4px; border-radius: 14px; background: var(--accent-soft); color: var(--accent-ink); }
+.research-icon { display: grid; place-items: center; width: 38px; height: 38px; flex: none; border-radius: 11px; background: var(--accent); color: white; }
+.research-hero h3 { margin-bottom: 4px; font-size: 0.98rem; }
+.research-hero p { color: var(--ink-2); font-size: 0.83rem; line-height: 1.48; }
+.research-note { color: var(--muted); font-size: 0.76rem; line-height: 1.45; }
+.research-error { padding: 10px 12px; border-radius: 10px; background: var(--red-soft); color: var(--red); font-size: 0.82rem; }
+.research-review { display: flex; flex-direction: column; gap: 12px; }
+.review-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--amber-soft); }
+.review-banner strong, .review-banner span { display: block; }
+.review-banner strong { font-size: 0.88rem; margin-bottom: 2px; }
+.review-banner div > span { color: var(--ink-2); font-size: 0.78rem; }
+.confidence { padding: 5px 9px; flex: none; border-radius: 99px; background: var(--surface); color: var(--amber); font-size: 0.72rem; font-weight: 700; }
+.confidence.high { color: var(--green); }
+.confidence.low { color: var(--red); }
+.research-section { display: flex; flex-direction: column; gap: 11px; padding: 15px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.research-section h3 { font-size: 0.9rem; color: var(--accent-ink); }
+.source-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.source-list a { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 11px; border-radius: 11px; background: var(--sunken); color: var(--ink); text-decoration: none; transition: transform 140ms var(--ease-out), background-color 140ms ease; }
+.source-list a:active { transform: scale(0.98); }
+.source-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; }
+.source-list span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); font-size: 0.7rem; }
+.source-list small { display: -webkit-box; overflow: hidden; color: var(--muted); font-size: 0.7rem; line-height: 1.35; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.spinner { width: 14px; height: 14px; border: 2px solid rgb(255 255 255 / 0.4); border-top-color: #fff; border-radius: 50%; animation: spin 600ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (hover: hover) and (pointer: fine) {
+  .source-list a:hover { transform: translateY(-1px); background: var(--accent-soft); }
+}
+
 @media (max-width: 900px) { .overview { grid-template-columns: 1fr; } }
 @media (max-width: 640px) {
   .head { align-items: stretch; flex-direction: column; gap: 12px; }
@@ -361,9 +543,14 @@ function toggleMember(id) {
   .tab { flex: 0 0 auto; min-height: 40px; padding-inline: 14px; }
   .overview { gap: 10px; }
   .panel { padding: 16px; }
+  .panel-heading { align-items: stretch; flex-direction: column; }
+  .panel-heading .btn { width: 100%; }
   .info-grid { gap: 4px; }
   .info-item { padding-inline: 4px; }
   .row2 { grid-template-columns: 1fr; }
+  .review-banner { align-items: flex-start; flex-direction: column; }
+  .source-list { grid-template-columns: 1fr; }
+  .research-section { padding: 13px; }
   .chip { min-height: 38px; }
 }
 </style>
