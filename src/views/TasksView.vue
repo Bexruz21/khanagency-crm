@@ -16,12 +16,15 @@ const brands = ref([])
 const filterBrand = ref('')
 const filterAssignee = ref('')
 
-const columns = [
+const activeColumns = [
   { id: 'todo', label: 'К выполнению' },
   { id: 'in_progress', label: 'В работе' },
   { id: 'review', label: 'На проверке' },
-  { id: 'done', label: 'Выполнено' },
 ]
+const doneColumn = { id: 'done', label: 'Выполнено' }
+const showCompleted = ref(false)
+const columns = computed(() => showCompleted.value ? [...activeColumns, doneColumn] : activeColumns)
+const completedCount = computed(() => (tasks.value || []).filter((t) => t.status === 'done').length)
 
 // --- модалки ---
 const createModal = ref(false)
@@ -32,8 +35,10 @@ const form = reactive({ ...blank })
 const detail = ref(null)       // подробная задача
 const commentText = ref('')
 const fileInput = ref(null)
+const detailOpeningId = ref(null)
 let syncTimer = null
 let syncInFlight = false
+let suppressCardClick = false
 
 async function load() {
   const params = new URLSearchParams()
@@ -96,7 +101,20 @@ async function onDrop(status) {
     await load()
   } catch {
     task.status = prev
+  } finally {
+    dragId.value = null
   }
+}
+
+function onDragStart(taskId) {
+  dragId.value = taskId
+  suppressCardClick = true
+}
+
+function onDragEnd() {
+  dragId.value = null
+  // click после dragend генерируется в том же event loop — пропускаем только его.
+  setTimeout(() => { suppressCardClick = false }, 0)
 }
 
 /** Кнопки workflow в карточке задачи */
@@ -117,8 +135,15 @@ async function createTask() {
 }
 
 async function openDetail(task) {
-  const { data } = await api.get(`/tasks/${task.id}/`)
-  detail.value = data
+  if (suppressCardClick || detail.value || detailOpeningId.value !== null) return
+  detailOpeningId.value = task.id
+  try {
+    const { data } = await api.get(`/tasks/${task.id}/`)
+    // Если пользователь успел уйти со страницы, устаревший ответ не открывает окно.
+    if (detailOpeningId.value === task.id) detail.value = data
+  } finally {
+    if (detailOpeningId.value === task.id) detailOpeningId.value = null
+  }
 }
 
 async function refreshDetail() {
@@ -174,6 +199,9 @@ function fileName(url) {
           <option v-for="u in users" :key="u.id" :value="u.id">{{ u.full_name }}</option>
         </select>
         <button class="btn soft" @click="downloadPdf(`/tasks/pdf/?brand=${filterBrand}&assignee=${filterAssignee}`, 'Tasks.pdf')">↓ PDF</button>
+        <button class="btn soft" @click="showCompleted = !showCompleted">
+          {{ showCompleted ? 'Скрыть выполненные' : `Архив (${completedCount})` }}
+        </button>
         <button v-if="!isEmployee" class="btn" @click="createModal = true">+ Задача</button>
       </div>
     </div>
@@ -182,7 +210,7 @@ function fileName(url) {
       <div v-for="i in 4" :key="i" class="skeleton" style="height: 300px" />
     </div>
 
-    <div v-else class="board">
+    <div v-else class="board" :class="{ 'without-archive': !showCompleted }">
       <div
         v-for="col in columns" :key="col.id"
         class="column" :class="{ over: dragOver === col.id }"
@@ -201,7 +229,8 @@ function fileName(url) {
             v-for="t in byColumn[col.id]" :key="t.id"
             class="card task flip-move"
             :draggable="!isEmployee"
-            @dragstart="dragId = t.id"
+            @dragstart="onDragStart(t.id)"
+            @dragend="onDragEnd"
             @click="openDetail(t)"
           >
             <div class="task-top">
@@ -376,6 +405,7 @@ function fileName(url) {
   gap: 12px;
   align-items: start;
 }
+.board.without-archive { grid-template-columns: repeat(3, 1fr); }
 .column {
   background: var(--sunken);
   border-radius: var(--radius);
@@ -482,13 +512,15 @@ function fileName(url) {
 .history li { font-size: 0.82rem; color: var(--ink-2); display: flex; gap: 10px; }
 .h-time { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-@media (max-width: 1100px) { .board { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 1100px) {
+  .board, .board.without-archive { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 640px) {
   .head { align-items: stretch; }
   .filters { width: 100%; flex-wrap: wrap; }
   .filters .select { width: auto; flex: 1 1 150px; }
   .filters .btn { flex: 1 1 auto; }
-  .board { grid-template-columns: 1fr; gap: 10px; }
+  .board, .board.without-archive { grid-template-columns: 1fr; gap: 10px; }
   .column { min-height: 120px; padding: 9px; }
   .task { padding: 14px; }
   .row2, .detail-controls { grid-template-columns: 1fr; }
