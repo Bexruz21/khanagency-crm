@@ -7,6 +7,7 @@ const routes = [
   { path: '/brands', name: 'brands', component: () => import('../views/BrandsView.vue'), meta: { managerOnly: true } },
   { path: '/brands/:id', name: 'brand', component: () => import('../views/BrandDetailView.vue'), meta: { managerOnly: true } },
   { path: '/tasks', name: 'tasks', component: () => import('../views/TasksView.vue') },
+  { path: '/tasks/archive', name: 'task-archive', component: () => import('../views/TaskArchiveView.vue') },
   { path: '/my-content', name: 'my-content', component: () => import('../views/MyContentView.vue') },
   { path: '/team', name: 'team', component: () => import('../views/TeamView.vue'), meta: { managerOnly: true } },
   { path: '/profile', name: 'profile', component: () => import('../views/ProfileView.vue') },

@@ -16,15 +16,12 @@ const brands = ref([])
 const filterBrand = ref('')
 const filterAssignee = ref('')
 
-const activeColumns = [
+const columns = [
   { id: 'todo', label: 'К выполнению' },
   { id: 'in_progress', label: 'В работе' },
   { id: 'review', label: 'На проверке' },
+  { id: 'done', label: 'Выполнено' },
 ]
-const doneColumn = { id: 'done', label: 'Выполнено' }
-const showCompleted = ref(false)
-const columns = computed(() => showCompleted.value ? [...activeColumns, doneColumn] : activeColumns)
-const completedCount = computed(() => (tasks.value || []).filter((t) => t.status === 'done').length)
 
 // --- модалки ---
 const createModal = ref(false)
@@ -81,9 +78,23 @@ async function syncFromServer() {
 
 const byColumn = computed(() => {
   const map = { todo: [], in_progress: [], review: [], done: [] }
-  for (const t of tasks.value || []) if (map[t.status]) map[t.status].push(t)
+  for (const t of tasks.value || []) {
+    if (!map[t.status]) continue
+    // Выполненные остаются на доске до конца текущего дня, затем доступны в архиве.
+    if (t.status === 'done' && !isToday(t.completed_at)) continue
+    map[t.status].push(t)
+  }
   return map
 })
+
+function isToday(value) {
+  if (!value) return false
+  const date = new Date(value)
+  const now = new Date()
+  return date.getFullYear() === now.getFullYear()
+    && date.getMonth() === now.getMonth()
+    && date.getDate() === now.getDate()
+}
 
 // --- drag & drop ---
 const dragId = ref(null)
@@ -199,9 +210,7 @@ function fileName(url) {
           <option v-for="u in users" :key="u.id" :value="u.id">{{ u.full_name }}</option>
         </select>
         <button class="btn soft" @click="downloadPdf(`/tasks/pdf/?brand=${filterBrand}&assignee=${filterAssignee}`, 'Tasks.pdf')">↓ PDF</button>
-        <button class="btn soft" @click="showCompleted = !showCompleted">
-          {{ showCompleted ? 'Скрыть выполненные' : `Архив (${completedCount})` }}
-        </button>
+        <RouterLink to="/tasks/archive" class="btn soft">Архив</RouterLink>
         <button v-if="!isEmployee" class="btn" @click="createModal = true">+ Задача</button>
       </div>
     </div>
@@ -210,7 +219,7 @@ function fileName(url) {
       <div v-for="i in 4" :key="i" class="skeleton" style="height: 300px" />
     </div>
 
-    <div v-else class="board" :class="{ 'without-archive': !showCompleted }">
+    <div v-else class="board">
       <div
         v-for="col in columns" :key="col.id"
         class="column" :class="{ over: dragOver === col.id }"
@@ -405,7 +414,6 @@ function fileName(url) {
   gap: 12px;
   align-items: start;
 }
-.board.without-archive { grid-template-columns: repeat(3, 1fr); }
 .column {
   background: var(--sunken);
   border-radius: var(--radius);
@@ -513,14 +521,14 @@ function fileName(url) {
 .h-time { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 @media (max-width: 1100px) {
-  .board, .board.without-archive { grid-template-columns: repeat(2, 1fr); }
+  .board { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 640px) {
   .head { align-items: stretch; }
   .filters { width: 100%; flex-wrap: wrap; }
   .filters .select { width: auto; flex: 1 1 150px; }
   .filters .btn { flex: 1 1 auto; }
-  .board, .board.without-archive { grid-template-columns: 1fr; gap: 10px; }
+  .board { grid-template-columns: 1fr; gap: 10px; }
   .column { min-height: 120px; padding: 9px; }
   .task { padding: 14px; }
   .row2, .detail-controls { grid-template-columns: 1fr; }
