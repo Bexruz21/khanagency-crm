@@ -1,0 +1,233 @@
+/* ============ KHAN CRM design system ============
+   Анимации по принципам Emil Kowalski / Apple:
+   - сильные кастомные easing-кривые, UI ≤ 300ms
+   - ease-out на входах, никаких ease-in
+   - scale(0.97) на нажатии, transform/opacity only
+   - hover за @media (hover:hover), reduced-motion уважается
+================================================== */
+
+:root {
+  /* motion */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-press: 140ms;
+  --dur-fast: 180ms;
+  --dur-med: 240ms;
+
+  /* palette — тёплый графит + индиго */
+  --bg: #f4f4f8;
+  --surface: #ffffff;
+  --ink: #191927;
+  --ink-2: #4b4b60;
+  --muted: #8a8aa3;
+  --line: #e7e7ef;
+  --accent: #4f46e5;
+  --accent-soft: #eef0ff;
+  --accent-ink: #3730a3;
+  --green: #0d9466;
+  --green-soft: #e4f7ef;
+  --amber: #b45309;
+  --amber-soft: #fdf1de;
+  --red: #dc2626;
+  --red-soft: #fdeaea;
+  --sky: #0369a1;
+  --sky-soft: #e3f3fc;
+  --violet: #7c3aed;
+  --violet-soft: #f1eafd;
+
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow-sm: 0 1px 2px rgb(20 20 40 / 0.05), 0 1px 6px rgb(20 20 40 / 0.04);
+  --shadow-md: 0 4px 14px rgb(20 20 40 / 0.08), 0 1px 3px rgb(20 20 40 / 0.05);
+  --shadow-lg: 0 18px 45px rgb(20 20 40 / 0.16);
+
+  color-scheme: light;
+  font-size: 15px;
+}
+
+/* ---------- тёмная тема ---------- */
+:root[data-theme="dark"] {
+  --bg: #0f0f17;
+  --surface: #1a1a26;
+  --ink: #ecebf5;
+  --ink-2: #b3b2c9;
+  --muted: #7d7c96;
+  --line: #2b2b3d;
+  --accent: #8078f2;
+  --accent-soft: #232049;
+  --accent-ink: #b6b0ff;
+  --green: #34d399;
+  --green-soft: #12312a;
+  --amber: #fbbf24;
+  --amber-soft: #362a12;
+  --red: #f87171;
+  --red-soft: #3a1f22;
+  --sky: #38bdf8;
+  --sky-soft: #122b3a;
+  --violet: #a78bfa;
+  --violet-soft: #2a2140;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 6px rgb(0 0 0 / 0.25);
+  --shadow-md: 0 4px 14px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 18px 45px rgb(0 0 0 / 0.55);
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #app { height: 100%; }
+
+body {
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { line-height: 1.15; letter-spacing: -0.02em; font-weight: 700; }
+
+.page-title { font-size: 1.5rem; margin-bottom: 20px; }
+
+::selection { background: var(--accent-soft); color: var(--accent-ink); }
+
+/* ---------- controls ---------- */
+button, input, select, textarea { font: inherit; color: inherit; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
+  font-weight: 600;
+  font-size: 0.93rem;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+  white-space: nowrap;
+  transition: transform var(--dur-press) var(--ease-out),
+              background-color var(--dur-fast) ease,
+              box-shadow var(--dur-fast) ease;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.55; cursor: default; }
+.btn.ghost { background: transparent; color: var(--ink-2); }
+.btn.soft { background: var(--accent-soft); color: var(--accent-ink); }
+.btn.outline { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.btn.danger { background: var(--red-soft); color: var(--red); }
+.btn.sm { padding: 5px 11px; font-size: 0.85rem; }
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { background: #4338ca; }
+  .btn.ghost:hover { background: rgb(20 20 40 / 0.06); color: var(--ink); }
+  .btn.soft:hover { background: #e2e6ff; }
+  .btn.outline:hover { box-shadow: inset 0 0 0 1px #cfcfe0; }
+  .btn.danger:hover { background: #fbdcdc; }
+}
+
+.input, .select, .textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 9px 12px;
+  font-size: 0.93rem;
+  outline: none;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+.input:focus, .select:focus, .textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(79 70 229 / 0.13);
+}
+.textarea { resize: vertical; min-height: 88px; }
+label.field { display: block; font-size: 0.83rem; font-weight: 600; color: var(--ink-2); margin-bottom: 4px; }
+
+/* ---------- surfaces ---------- */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--line);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* ---------- entrances: stagger, из scale(0.98), никогда из scale(0) ---------- */
+.rise {
+  opacity: 0;
+  transform: translateY(8px) scale(0.985);
+  animation: rise var(--dur-med) var(--ease-out) forwards;
+}
+@keyframes rise {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.rise:nth-child(1) { animation-delay: 0ms; }
+.rise:nth-child(2) { animation-delay: 40ms; }
+.rise:nth-child(3) { animation-delay: 80ms; }
+.rise:nth-child(4) { animation-delay: 120ms; }
+.rise:nth-child(5) { animation-delay: 160ms; }
+.rise:nth-child(6) { animation-delay: 200ms; }
+.rise:nth-child(7) { animation-delay: 240ms; }
+.rise:nth-child(8) { animation-delay: 280ms; }
+.rise:nth-child(n+9) { animation-delay: 300ms; }
+
+/* переходы страниц: только opacity + лёгкий сдвиг, выход быстрее входа */
+.page-enter-active { transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out); }
+.page-leave-active { transition: opacity 120ms ease; }
+.page-enter-from { opacity: 0; transform: translateY(6px); }
+.page-leave-to { opacity: 0; }
+
+/* модалка: центр, scale от 0.96 */
+.modal-enter-active { transition: opacity var(--dur-fast) var(--ease-out); }
+.modal-leave-active { transition: opacity 130ms ease; }
+.modal-enter-active .modal-box { transition: transform var(--dur-med) var(--ease-drawer), opacity var(--dur-fast) var(--ease-out); }
+.modal-leave-active .modal-box { transition: transform 130ms ease, opacity 130ms ease; }
+.modal-enter-from { opacity: 0; }
+.modal-enter-from .modal-box { opacity: 0; transform: scale(0.96) translateY(10px); }
+.modal-leave-to { opacity: 0; }
+.modal-leave-to .modal-box { opacity: 0; transform: scale(0.98); }
+
+/* list transition для kanban/таблиц — интерраптибельно */
+.flip-move { transition: transform var(--dur-med) var(--ease-in-out); }
+.flip-enter-active { transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.flip-leave-active { transition: opacity 120ms ease; position: absolute; }
+.flip-enter-from { opacity: 0; transform: translateY(6px) scale(0.98); }
+.flip-leave-to { opacity: 0; }
+
+/* skeleton shimmer */
+.skeleton {
+  background: linear-gradient(100deg, var(--line) 40%, var(--surface) 50%, var(--line) 60%);
+  background-size: 200% 100%;
+  animation: shimmer 1.1s linear infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* поверхность-«подложка» (kanban-колонки, сегмент-табы) — адаптивна к теме */
+:root { --sunken: #ececf3; }
+:root[data-theme="dark"] { --sunken: #12121c; }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 3px solid var(--bg); }
+::-webkit-scrollbar-track { background: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rise { animation-duration: 1ms; animation-delay: 0ms !important; }
+  .page-enter-from, .flip-enter-from { transform: none; }
+  .modal-enter-from .modal-box { transform: none; }
+  .flip-move { transition: none; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.05s !important; }
+}
