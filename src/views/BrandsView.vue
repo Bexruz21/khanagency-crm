@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import api from '../api'
 import AppModal from '../components/AppModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -10,6 +10,7 @@ const brands = ref(null)
 const users = ref([])
 const modal = ref(false)
 const saving = ref(false)
+const projectManagers = computed(() => users.value.filter((user) => ['admin', 'pm'].includes(user.role)))
 
 const form = reactive({
   name: '', niche: '', description: '',
@@ -99,7 +100,7 @@ async function save() {
             <label class="field">Project Manager</label>
             <select v-model="form.manager" class="select">
               <option :value="null">—</option>
-              <option v-for="u in users" :key="u.id" :value="u.id">{{ u.full_name }}</option>
+              <option v-for="u in projectManagers" :key="u.id" :value="u.id">{{ u.full_name }}</option>
             </select>
           </div>
           <div><label class="field">Дата начала</label><input v-model="form.start_date" type="date" class="input" /></div>

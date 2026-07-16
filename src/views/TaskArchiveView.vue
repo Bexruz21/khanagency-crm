@@ -197,6 +197,8 @@ onMounted(load)
   padding: 14px;
   margin-bottom: 14px;
 }
+.filters > div { min-width: 0; }
+.filters .input, .filters .select { display: block; width: 100%; max-width: 100%; min-width: 0; }
 .filters.employee { grid-template-columns: repeat(3, minmax(145px, 1fr)) auto; }
 .reset { white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
@@ -206,6 +208,9 @@ th {
   letter-spacing: 0.05em; padding: 12px 14px; border-bottom: 1px solid var(--line); white-space: nowrap;
 }
 td { padding: 12px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.table-wrap th:nth-child(2), .table-wrap th:nth-child(3),
+.table-wrap td:nth-child(2), .table-wrap td:nth-child(3) { text-align: left; }
+.table-wrap .person { justify-content: flex-start; }
 tbody tr:last-child td { border-bottom: 0; }
 .task-row { cursor: pointer; transition: background 140ms ease; }
 .task-row:hover, .task-row:focus-visible { background: var(--sunken); outline: none; }
@@ -237,7 +242,8 @@ section h4 { margin: 0 0 9px; font-size: 0.9rem; }
 
 @media (max-width: 1000px) { .filters, .filters.employee { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) {
-  .filters, .filters.employee { grid-template-columns: 1fr; }
+  .filters, .filters.employee { width: 100%; max-width: 100%; grid-template-columns: minmax(0, 1fr); overflow: hidden; }
+  .filters > div, .filters .input, .filters .select { width: 100%; max-width: 100%; min-width: 0; }
   .reset { width: 100%; }
   th, td { padding-inline: 11px; }
   .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

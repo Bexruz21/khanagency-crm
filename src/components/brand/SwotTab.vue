@@ -14,10 +14,10 @@ const aiModal = ref(false)
 const brief = ref('')
 
 const sections = [
-  { key: 'strengths', title: 'Strengths · Сильные стороны', tone: 'green' },
-  { key: 'weaknesses', title: 'Weaknesses · Слабые стороны', tone: 'red' },
-  { key: 'opportunities', title: 'Opportunities · Возможности', tone: 'sky' },
-  { key: 'threats', title: 'Threats · Угрозы', tone: 'amber' },
+  { key: 'strengths', title: 'Strengths · Kuchli tomonlar', hint: 'Brend ichidagi ustunliklar va resurslar', tone: 'green' },
+  { key: 'weaknesses', title: 'Weaknesses · Zaif tomonlar', hint: 'Ichki cheklovlar va yaxshilash nuqtalari', tone: 'red' },
+  { key: 'opportunities', title: 'Opportunities · Imkoniyatlar', hint: 'Bozor o‘sishi va tashqi imkoniyatlar', tone: 'sky' },
+  { key: 'threats', title: 'Threats · Tahdidlar', hint: 'Tashqi xavflar va raqobat bosimi', tone: 'amber' },
 ]
 
 onMounted(async () => {
@@ -84,6 +84,7 @@ async function save() {
       <div class="quad">
         <section v-for="s in sections" :key="s.key" class="card sec rise" :class="s.tone">
           <h3>{{ s.title }}</h3>
+          <p class="section-hint">{{ s.hint }}</p>
           <TransitionGroup name="flip" tag="div" class="items">
             <div v-for="(item, i) in swot[s.key]" :key="s.key + i" class="item flip-move">
               <textarea
@@ -99,9 +100,15 @@ async function save() {
     </div>
 
     <AppModal :open="aiModal" title="AI-генерация SWOT" @close="aiModal = false">
+      <div class="ai-guide">
+        <strong>Чтобы анализ был точным</strong>
+        <span>Добавьте аудиторию, главных конкурентов, географию, цены и текущую проблему бренда.</span>
+        <span>Результат будет сформирован на узбекском языке латиницей.</span>
+      </div>
       <label class="field">Краткое описание бренда</label>
       <textarea v-model="brief" class="textarea" rows="5"
         placeholder="Чем занимается бренд, аудитория, конкуренты, особенности…" />
+      <div class="brief-meta"><span>Можно редактировать результат перед сохранением</span><span>{{ brief.length }} символов</span></div>
       <p v-if="error" class="error">{{ error }}</p>
       <template #footer>
         <button class="btn outline" @click="aiModal = false">Отмена</button>
@@ -130,6 +137,7 @@ async function save() {
 .sec.sky { border-top-color: var(--sky); }
 .sec.amber { border-top-color: var(--amber); }
 .sec h3 { font-size: 0.94rem; margin-bottom: 10px; }
+.section-hint { color: var(--muted); font-size: 0.76rem; margin: -5px 0 11px; line-height: 1.4; }
 
 .items { position: relative; display: flex; flex-direction: column; gap: 7px; }
 .item { display: flex; gap: 6px; align-items: flex-start; }
@@ -137,6 +145,9 @@ async function save() {
 .add { margin-top: 8px; color: var(--muted); }
 
 .error { color: var(--red); font-size: 0.85rem; margin-top: 10px; }
+.ai-guide { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; margin-bottom: 14px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-ink); font-size: 0.82rem; line-height: 1.4; }
+.ai-guide strong { font-size: 0.88rem; }
+.brief-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; color: var(--muted); font-size: 0.72rem; }
 
 .spinner {
   width: 14px; height: 14px;

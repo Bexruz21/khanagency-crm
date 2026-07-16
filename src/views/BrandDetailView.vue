@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../api'
 import AppModal from '../components/AppModal.vue'
@@ -15,6 +15,7 @@ const route = useRoute()
 const brand = ref(null)
 const tab = ref('overview')
 const users = ref([])
+const projectManagers = computed(() => users.value.filter((user) => ['admin', 'pm'].includes(user.role)))
 
 const tabs = [
   { id: 'overview', label: 'Обзор' },
@@ -221,7 +222,7 @@ function toggleMember(id) {
           <label class="field">Project Manager</label>
           <select v-model="form.manager" class="select">
             <option :value="null">—</option>
-            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.full_name }}</option>
+            <option v-for="u in projectManagers" :key="u.id" :value="u.id">{{ u.full_name }}</option>
           </select>
         </div>
         <div>

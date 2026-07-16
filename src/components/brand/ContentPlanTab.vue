@@ -145,7 +145,7 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
       </select>
       <div class="actions">
         <button class="btn soft sm" @click="downloadPdf(`/content/pdf/?brand=${brand.id}`, `ContentPlan_${brand.name}.pdf`)">↓ PDF</button>
-        <button class="btn outline sm" @click="brief = brand.description; ideas = []; aiModal = true">✦ Generate Ideas</button>
+        <button class="btn outline sm" @click="brief = brand.description; ideas = []; aiModal = true">✦ AI-идеи</button>
         <button class="btn sm" @click="openCreate">+ Запись</button>
       </div>
     </div>
@@ -256,6 +256,10 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
     <!-- ===== AI-идеи ===== -->
     <AppModal :open="aiModal" title="✦ AI: идеи для контент-плана" width="640px" @close="aiModal = false">
       <template v-if="!ideas.length">
+        <div class="ai-guide">
+          <strong>Контент на узбекском языке латиницей</strong>
+          <span>AI подготовит производственные идеи только для Reels, Post и Stories: hook, визуал, цель и CTA.</span>
+        </div>
         <label class="field">Краткая информация о бренде</label>
         <textarea v-model="brief" class="textarea" rows="4"
           placeholder="Продукт, аудитория, тон, что хотим продвигать в этом месяце…" />
@@ -288,7 +292,7 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
           <button class="btn outline" @click="aiModal = false">Отмена</button>
           <button class="btn" :disabled="generating || !brief.trim()" @click="generateIdeas">
             <span v-if="generating" class="spinner" />
-            {{ generating ? 'Claude придумывает…' : '✦ Предложить идеи' }}
+            {{ generating ? 'AI разрабатывает идеи…' : '✦ Предложить идеи' }}
           </button>
         </template>
         <template v-else>
@@ -328,6 +332,8 @@ tbody tr:last-child td { border-bottom: 0; }
 .ai-dot { color: var(--violet); margin-right: 3px; }
 .assignee { display: inline-flex; align-items: center; gap: 7px; }
 .muted { color: var(--muted); }
+.ai-guide { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; margin-bottom: 14px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-ink); font-size: 0.82rem; line-height: 1.4; }
+.ai-guide strong { font-size: 0.88rem; }
 .empty { text-align: center; color: var(--muted); padding: 28px !important; cursor: default; }
 
 .status-select {

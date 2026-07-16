@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import api from './api'
 import { useAuthStore } from './stores/auth'
@@ -25,12 +25,16 @@ let pollTimer = null
 let notificationsLoading = false
 
 async function pollNotifications() {
-  if (!auth.user || !auth.isAuthed || notificationsLoading) return
+  // Не забираем уведомления под экраном входа: раньше они сразу становились seen,
+  // пока dashboard ещё не был показан, поэтому сотрудник визуально терял toast.
+  if (isLogin.value || !auth.user || !auth.isAuthed || notificationsLoading || document.hidden) return
   notificationsLoading = true
   try {
     const { data } = await api.get('/notifications/unseen/')
     if (data.length) {
       for (const n of data) toasts.push(n.text, n.kind, n.link)
+      // Сначала гарантируем отрисовку toast, только затем подтверждаем доставку backend.
+      await nextTick()
       await api.post('/notifications/mark-seen/', { ids: data.map((n) => n.id) })
     }
   } catch {
@@ -40,16 +44,25 @@ async function pollNotifications() {
   }
 }
 
-// App не перемонтируется после login, поэтому забираем toast сразу после появления пользователя.
-watch(() => auth.user?.id, (userId) => {
-  if (userId) pollNotifications()
+// App не перемонтируется после login. Ждём одновременно пользователя и завершение перехода
+// с /login, чтобы toast появился уже поверх рабочего интерфейса.
+watch([() => auth.user?.id, () => route.name], ([userId, routeName]) => {
+  if (userId && routeName !== 'login') pollNotifications()
 })
+
+function pollWhenVisible() {
+  if (!document.hidden) pollNotifications()
+}
 
 onMounted(() => {
   pollNotifications()
   pollTimer = setInterval(pollNotifications, 3000)
+  document.addEventListener('visibilitychange', pollWhenVisible)
 })
-onUnmounted(() => clearInterval(pollTimer))
+onUnmounted(() => {
+  clearInterval(pollTimer)
+  document.removeEventListener('visibilitychange', pollWhenVisible)
+})
 
 const ICONS = {
   dashboard: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z',

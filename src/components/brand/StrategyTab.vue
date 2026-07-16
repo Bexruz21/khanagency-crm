@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import api, { downloadPdf } from '../../api'
 import AppModal from '../AppModal.vue'
 
@@ -14,17 +14,24 @@ const aiModal = ref(false)
 const brief = ref('')
 
 const listFields = [
-  { key: 'goals', title: 'Цели' },
-  { key: 'kpi', title: 'KPI' },
-  { key: 'channels', title: 'Каналы продвижения' },
-  { key: 'recommendations', title: 'Рекомендации' },
+  { key: 'goals', title: 'Цели', hint: 'Измеримые результаты и сроки' },
+  { key: 'kpi', title: 'KPI', hint: 'Метрика, целевое значение и период' },
+  { key: 'channels', title: 'Каналы продвижения', hint: 'Роль каждого канала и ожидаемый результат' },
+  { key: 'recommendations', title: 'Рекомендации', hint: 'Приоритетные следующие действия' },
 ]
 const textFields = [
-  { key: 'target_audience', title: 'Целевая аудитория' },
-  { key: 'positioning', title: 'Позиционирование' },
-  { key: 'tone_of_voice', title: 'Tone of Voice' },
-  { key: 'strategy', title: 'Маркетинговая стратегия', tall: true },
+  { key: 'target_audience', title: 'Целевая аудитория', hint: 'Сегменты, потребности, мотивы и возражения' },
+  { key: 'positioning', title: 'Позиционирование', hint: 'Обещание бренда, отличие и доказательство' },
+  { key: 'tone_of_voice', title: 'Tone of Voice', hint: 'Как бренд говорит и какие формулировки использует' },
+  { key: 'strategy', title: 'Маркетинговая стратегия', hint: 'Последовательный план действий на 90 дней', tall: true },
 ]
+
+const completion = computed(() => {
+  if (!strategy.value) return 0
+  const listDone = listFields.filter((field) => strategy.value[field.key]?.some((item) => item.trim())).length
+  const textDone = textFields.filter((field) => strategy.value[field.key]?.trim()).length
+  return Math.round(((listDone + textDone) / (listFields.length + textFields.length)) * 100)
+})
 
 onMounted(async () => {
   const { data } = await api.get(`/brands/${props.brand.id}/strategy/`)
@@ -82,8 +89,10 @@ async function save() {
 
     <div v-else>
       <div class="toolbar">
-        <span v-if="strategy.generated_by_ai" class="badge ai-badge">✦ создана AI — отредактируйте под себя</span>
-        <span v-else />
+        <div class="completion">
+          <span>{{ completion }}% заполнено</span>
+          <div><i :style="{ width: completion + '%' }" /></div>
+        </div>
         <div class="actions">
           <button class="btn outline sm" @click="brief = brand.description; aiModal = true">✦ Перегенерировать</button>
           <button class="btn soft sm" @click="downloadPdf(`/brands/${brand.id}/strategy/pdf/`, `Strategy_${brand.name}.pdf`)">↓ PDF</button>
@@ -95,6 +104,7 @@ async function save() {
         <div class="col">
           <section v-for="f in listFields" :key="f.key" class="card sec rise">
             <h3>{{ f.title }}</h3>
+            <p class="section-hint">{{ f.hint }}</p>
             <div class="items">
               <div v-for="(item, i) in strategy[f.key]" :key="f.key + i" class="item">
                 <textarea
@@ -110,6 +120,7 @@ async function save() {
         <div class="col">
           <section v-for="f in textFields" :key="f.key" class="card sec rise">
             <h3>{{ f.title }}</h3>
+            <p class="section-hint">{{ f.hint }}</p>
             <textarea v-model="strategy[f.key]" class="textarea" :rows="f.tall ? 12 : 4" />
           </section>
         </div>
@@ -117,9 +128,15 @@ async function save() {
     </div>
 
     <AppModal :open="aiModal" title="AI-генерация стратегии" @close="aiModal = false">
+      <div class="ai-guide">
+        <strong>Профессиональная стратегия на 90 дней</strong>
+        <span>Укажите аудиторию, продукт, цены, географию, конкурентов и бизнес-цель.</span>
+        <span>AI подготовит результат на узбекском языке латиницей: SMART-цели, KPI и план действий.</span>
+      </div>
       <label class="field">Краткое описание бренда</label>
       <textarea v-model="brief" class="textarea" rows="5"
         placeholder="Продукт, аудитория, цели бизнеса, бюджет, конкуренты…" />
+      <div class="brief-meta"><span>После генерации все разделы можно исправить</span><span>{{ brief.length }} символов</span></div>
       <p v-if="error" class="error">{{ error }}</p>
       <template #footer>
         <button class="btn outline" @click="aiModal = false">Отмена</button>
@@ -140,17 +157,24 @@ async function save() {
 
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .ai-badge { background: var(--violet-soft); color: var(--violet); }
+.completion { width: min(220px, 100%); color: var(--muted); font-size: 0.76rem; font-weight: 650; }
+.completion > div { height: 6px; margin-top: 5px; overflow: hidden; border-radius: 99px; background: var(--line); }
+.completion i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 240ms var(--ease-in-out); }
 
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 .col { display: flex; flex-direction: column; gap: 14px; }
 .sec { padding: 16px 18px; }
 .sec h3 { font-size: 0.94rem; margin-bottom: 10px; color: var(--accent-ink); }
+.section-hint { color: var(--muted); font-size: 0.76rem; margin: -5px 0 11px; line-height: 1.4; }
 
 .items { display: flex; flex-direction: column; gap: 7px; }
 .item { display: flex; gap: 6px; align-items: flex-start; }
 .line { min-height: 38px; overflow: hidden; }
 .add { margin-top: 8px; color: var(--muted); }
 .error { color: var(--red); font-size: 0.85rem; margin-top: 10px; }
+.ai-guide { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; margin-bottom: 14px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-ink); font-size: 0.82rem; line-height: 1.4; }
+.ai-guide strong { font-size: 0.88rem; }
+.brief-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; color: var(--muted); font-size: 0.72rem; }
 
 .spinner {
   width: 14px; height: 14px;

@@ -27,8 +27,7 @@ export const CONTENT_STATUS = {
 }
 
 export const CONTENT_FORMAT = {
-  reels: 'Reels', post: 'Пост', stories: 'Stories',
-  carousel: 'Карусель', video: 'Видео', article: 'Статья',
+  reels: 'Reels', post: 'Post', stories: 'Stories',
 }
 
 export const BRAND_STATUS = {
