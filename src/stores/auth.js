@@ -6,12 +6,13 @@ let sessionPromise = null
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
+    accessToken: localStorage.getItem('khan_access'),
     loading: false,
     initialized: false,
     error: '',
   }),
   getters: {
-    isAuthed: () => !!localStorage.getItem('khan_access'),
+    isAuthed: (state) => !!state.accessToken,
     canManage: (s) => ['admin', 'pm'].includes(s.user?.role),
   },
   actions: {
@@ -22,6 +23,7 @@ export const useAuthStore = defineStore('auth', {
         const { data } = await publicApi.post('/auth/token/', { username, password })
         localStorage.setItem('khan_access', data.access)
         localStorage.setItem('khan_refresh', data.refresh)
+        this.accessToken = data.access
         await this.fetchMe()
         return true
       } catch (e) {
@@ -57,6 +59,7 @@ export const useAuthStore = defineStore('auth', {
     },
     logout() {
       this.user = null
+      this.accessToken = null
       this.initialized = true
       clearAuthSession()
     },

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import api from './api'
 import { useAuthStore } from './stores/auth'
@@ -22,9 +22,11 @@ function toggleSidebar() {
 
 /* ---- опрос уведомлений: непросмотренные показываем toast'ом ---- */
 let pollTimer = null
+let notificationsLoading = false
 
 async function pollNotifications() {
-  if (!auth.isAuthed) return
+  if (!auth.user || !auth.isAuthed || notificationsLoading) return
+  notificationsLoading = true
   try {
     const { data } = await api.get('/notifications/unseen/')
     if (data.length) {
@@ -33,12 +35,19 @@ async function pollNotifications() {
     }
   } catch {
     /* сервер недоступен — молча попробуем в следующий раз */
+  } finally {
+    notificationsLoading = false
   }
 }
 
+// App не перемонтируется после login, поэтому забираем toast сразу после появления пользователя.
+watch(() => auth.user?.id, (userId) => {
+  if (userId) pollNotifications()
+})
+
 onMounted(() => {
   pollNotifications()
-  pollTimer = setInterval(pollNotifications, 10000)
+  pollTimer = setInterval(pollNotifications, 3000)
 })
 onUnmounted(() => clearInterval(pollTimer))
 
