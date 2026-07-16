@@ -4,7 +4,7 @@ import api, { downloadPdf } from '../api'
 import AppModal from '../components/AppModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import UserAvatar from '../components/UserAvatar.vue'
-import { PRIORITY, TASK_STATUS, fmtDate } from '../labels'
+import { PRIORITY, TASK_STATUS, compactDateTime, fmtDate, maskCompactDateTime } from '../labels'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -26,7 +26,7 @@ const columns = [
 // --- модалки ---
 const createModal = ref(false)
 const saving = ref(false)
-const blank = { title: '', description: '', brand: null, assignee: null, deadline: null, priority: 'medium', priority_mode: 'manual', status: 'todo' }
+const blank = { title: '', description: '', brand: null, assignee: null, deadline: '', priority: 'medium', priority_mode: 'manual', status: 'todo' }
 const form = reactive({ ...blank })
 
 const detail = ref(null)       // подробная задача
@@ -136,7 +136,7 @@ async function setDetailStatus(status) {
 async function createTask() {
   saving.value = true
   try {
-    await api.post('/tasks/', form)
+    await api.post('/tasks/', { ...form, deadline: form.deadline || null })
     createModal.value = false
     Object.assign(form, blank)
     await load()
@@ -280,7 +280,7 @@ function fileName(url) {
           </div>
         </div>
         <div class="row2">
-          <div><label class="field">Дедлайн</label><input v-model="form.deadline" type="datetime-local" class="input" /></div>
+          <div><label class="field">Дедлайн</label><input :value="form.deadline" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @input="form.deadline = maskCompactDateTime($event.target.value)" /></div>
           <div>
             <label class="field">Приоритет</label>
             <div class="prio-row">
@@ -328,6 +328,12 @@ function fileName(url) {
         </div>
 
         <div v-if="!isEmployee" class="detail-controls">
+          <div>
+            <label class="field">Дедлайн</label>
+            <input class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ"
+              :value="compactDateTime(detail.deadline)"
+              @change="patchDetail({ deadline: maskCompactDateTime($event.target.value) || null })" />
+          </div>
           <div>
             <label class="field">Статус</label>
             <select class="select" :value="detail.status" @change="patchDetail({ status: $event.target.value })">

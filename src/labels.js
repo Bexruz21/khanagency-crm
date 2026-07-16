@@ -49,6 +49,24 @@ export function fmtDate(value, withTime = false) {
   return d.toLocaleString('ru-RU', opts).replace(',', ' ·')
 }
 
+export function compactDateTime(value) {
+  if (!value) return ''
+  if (/^\d{1,2}\.\d{1,2}(?:\s+\d{1,2}:\d{2})?$/.test(value)) return value
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const two = (number) => String(number).padStart(2, '0')
+  return `${two(d.getDate())}.${two(d.getMonth() + 1)} ${two(d.getHours())}:${two(d.getMinutes())}`
+}
+
+export function maskCompactDateTime(value) {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 8)
+  let result = digits.slice(0, 2)
+  if (digits.length > 2) result += `.${digits.slice(2, 4)}`
+  if (digits.length > 4) result += ` ${digits.slice(4, 6)}`
+  if (digits.length > 6) result += `:${digits.slice(6, 8)}`
+  return result
+}
+
 export function fmtMoney(value) {
   if (value == null) return '—'
   return Number(value).toLocaleString('ru-RU') + ' сум'

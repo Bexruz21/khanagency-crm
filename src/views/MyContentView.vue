@@ -58,9 +58,9 @@ async function setStatus(item, status) {
             <td class="title-cell" :title="item.description">{{ item.title }}</td>
             <td>{{ item.brand_name }}</td>
             <td>{{ CONTENT_FORMAT[item.format] }}</td>
-            <td>{{ fmtDate(item.shooting_date) }}</td>
-            <td>{{ fmtDate(item.editing_deadline) }}</td>
-            <td>{{ fmtDate(item.publish_date) }}</td>
+            <td>{{ fmtDate(item.shooting_date, true) }}</td>
+            <td>{{ fmtDate(item.editing_deadline, true) }}</td>
+            <td>{{ fmtDate(item.publish_date, true) }}</td>
             <td><StatusBadge :map="PRIORITY" :value="item.priority" /></td>
             <td>
               <select

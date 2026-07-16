@@ -4,7 +4,7 @@ import api, { downloadPdf } from '../../api'
 import AppModal from '../AppModal.vue'
 import StatusBadge from '../StatusBadge.vue'
 import UserAvatar from '../UserAvatar.vue'
-import { CONTENT_FORMAT, CONTENT_STATUS, PRIORITY, fmtDate } from '../../labels'
+import { CONTENT_FORMAT, CONTENT_STATUS, PRIORITY, compactDateTime, fmtDate, maskCompactDateTime } from '../../labels'
 
 const props = defineProps({ brand: Object })
 
@@ -20,7 +20,7 @@ const editingId = ref(null)
 const blank = {
   title: '', format: 'post', description: '', assignee: null,
   shooting_date: null, editing_deadline: null, publish_date: null,
-  status: 'idea', priority: 'medium', priority_mode: 'manual', comments: '',
+  status: 'idea', comments: '',
 }
 const form = reactive({ ...blank })
 
@@ -60,9 +60,9 @@ function openEdit(item) {
   saveError.value = ''
   Object.assign(form, {
     title: item.title, format: item.format, description: item.description,
-    assignee: item.assignee, shooting_date: item.shooting_date,
-    editing_deadline: item.editing_deadline, publish_date: item.publish_date,
-    status: item.status, priority: item.priority, priority_mode: item.priority_mode,
+    assignee: item.assignee, shooting_date: compactDateTime(item.shooting_date),
+    editing_deadline: compactDateTime(item.editing_deadline), publish_date: compactDateTime(item.publish_date),
+    status: item.status,
     comments: item.comments,
   })
   itemModal.value = true
@@ -177,9 +177,9 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
               </span>
               <span v-else class="muted">—</span>
             </td>
-            <td>{{ fmtDate(item.shooting_date) }}</td>
-            <td>{{ fmtDate(item.editing_deadline) }}</td>
-            <td>{{ fmtDate(item.publish_date) }}</td>
+            <td>{{ fmtDate(item.shooting_date, true) }}</td>
+            <td>{{ fmtDate(item.editing_deadline, true) }}</td>
+            <td>{{ fmtDate(item.publish_date, true) }}</td>
             <td @click.stop>
               <select
                 class="status-select" :value="item.status"
@@ -219,24 +219,12 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
             </select>
           </div>
         </div>
-        <div>
-          <label class="field">Приоритет</label>
-          <div class="prio-row">
-            <select v-model="form.priority" class="select" :disabled="form.priority_mode === 'auto'">
-              <option v-for="(v, k) in PRIORITY" :key="k" :value="k">{{ v.label }}</option>
-            </select>
-            <div class="mode-switch">
-              <button type="button" :class="{ on: form.priority_mode === 'manual' }" @click="form.priority_mode = 'manual'">Ручной</button>
-              <button type="button" :class="{ on: form.priority_mode === 'auto' }" @click="form.priority_mode = 'auto'">Авто</button>
-            </div>
-          </div>
-          <p v-if="form.priority_mode === 'auto'" class="mode-hint">Приоритет растёт сам по мере приближения дат съёмки/монтажа/публикации</p>
-        </div>
+        <p class="mode-hint">Приоритет рассчитывается автоматически по ближайшему этапу и его точному времени.</p>
         <div><label class="field">Описание</label><textarea v-model="form.description" class="textarea" rows="3" /></div>
         <div class="row3">
-          <div><label class="field">Дата съёмки</label><input v-model="form.shooting_date" type="date" class="input" /></div>
-          <div><label class="field">Дедлайн монтажа</label><input v-model="form.editing_deadline" type="date" class="input" /></div>
-          <div><label class="field">Публикация</label><input v-model="form.publish_date" type="date" class="input" /></div>
+          <div><label class="field">Съёмка</label><input :value="form.shooting_date" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @input="form.shooting_date = maskCompactDateTime($event.target.value)" /></div>
+          <div><label class="field">Монтаж</label><input :value="form.editing_deadline" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @input="form.editing_deadline = maskCompactDateTime($event.target.value)" /></div>
+          <div><label class="field">Публикация</label><input :value="form.publish_date" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @input="form.publish_date = maskCompactDateTime($event.target.value)" /></div>
         </div>
         <div>
           <label class="field">Ответственный</label>
