@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import api, { downloadPdf } from '../../api'
+import AppIcon from '../AppIcon.vue'
 import { CONTENT_STATUS, TASK_STATUS } from '../../labels'
 
 const props = defineProps({ brand: Object })
@@ -171,13 +172,13 @@ function rateTone(value) {
           <h2>Просроченные этапы</h2>
           <p class="muted small">Дата этапа прошла, а запись ещё не продвинулась дальше</p>
           <div class="overdue-row" :class="{ ok: !report.content.overdue.shooting }">
-            <span>📸 Съёмка</span><strong>{{ report.content.overdue.shooting }}</strong>
+            <span><AppIcon name="camera" :size="16" /> Съёмка</span><strong>{{ report.content.overdue.shooting }}</strong>
           </div>
           <div class="overdue-row" :class="{ ok: !report.content.overdue.editing }">
-            <span>🎬 Монтаж</span><strong>{{ report.content.overdue.editing }}</strong>
+            <span><AppIcon name="movie" :size="16" /> Монтаж</span><strong>{{ report.content.overdue.editing }}</strong>
           </div>
           <div class="overdue-row" :class="{ ok: !report.content.overdue.publish }">
-            <span>📢 Публикация</span><strong>{{ report.content.overdue.publish }}</strong>
+            <span><AppIcon name="campaign" :size="16" /> Публикация</span><strong>{{ report.content.overdue.publish }}</strong>
           </div>
         </section>
       </div>

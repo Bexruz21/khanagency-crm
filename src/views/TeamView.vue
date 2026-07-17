@@ -1,7 +1,8 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import api from '../api'
 import AppModal from '../components/AppModal.vue'
+import AppIcon from '../components/AppIcon.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import KhanCoinIcon from '../components/KhanCoinIcon.vue'
 import { ROLE, fmtDate } from '../labels'
@@ -9,6 +10,13 @@ import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const users = ref(null)
+const isAdmin = computed(() => auth.user?.role === 'admin')
+const visibleUsers = computed(() => {
+  if (!users.value) return []
+  return auth.user?.role === 'pm'
+    ? users.value.filter((user) => user.role === 'employee')
+    : users.value
+})
 const modal = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -49,6 +57,7 @@ async function load() {
 onMounted(load)
 
 async function save() {
+  if (!isAdmin.value) return
   saving.value = true
   error.value = ''
   try {
@@ -69,7 +78,7 @@ async function save() {
   <div>
     <div class="head">
       <h1 class="page-title" style="margin: 0">Команда</h1>
-      <button v-if="auth.canManage" class="btn" @click="modal = true">+ Сотрудник</button>
+      <button v-if="isAdmin" class="btn" @click="modal = true">+ Сотрудник</button>
     </div>
 
     <div v-if="!users" class="cards">
@@ -77,7 +86,7 @@ async function save() {
     </div>
 
     <div v-else class="cards">
-      <div v-for="u in users" :key="u.id" class="card person rise" @click="openStats(u)">
+      <div v-for="u in visibleUsers" :key="u.id" class="card person rise" @click="openStats(u)">
         <UserAvatar :user="u" :size="46" />
         <div class="info">
           <strong>{{ u.full_name }}</strong>
@@ -90,7 +99,7 @@ async function save() {
         </div>
         <div class="contact">
           <span class="coins" :class="{ neg: u.khan_coins < 0 }"><KhanCoinIcon :size="17" /> {{ fmtCoins(u.khan_coins) }}</span>
-          <span v-if="u.telegram_chat_id" class="tg">✈ Telegram</span>
+          <span v-if="u.telegram_chat_id" class="tg"><AppIcon name="send" :size="15" /> Telegram</span>
           <span class="more">Статистика →</span>
         </div>
       </div>
@@ -145,7 +154,7 @@ async function save() {
       </template>
     </AppModal>
 
-    <AppModal :open="modal" title="Новый сотрудник" width="560px" @close="modal = false">
+    <AppModal :open="modal && isAdmin" title="Новый сотрудник" width="560px" @close="modal = false">
       <div class="form">
         <div class="row2">
           <div><label class="field">Имя</label><input v-model="form.first_name" class="input" /></div>

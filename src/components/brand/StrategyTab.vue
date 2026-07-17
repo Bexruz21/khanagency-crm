@@ -2,8 +2,9 @@
 import { computed, onMounted, ref } from 'vue'
 import api, { downloadPdf } from '../../api'
 import AppModal from '../AppModal.vue'
+import AppIcon from '../AppIcon.vue'
 
-const props = defineProps({ brand: Object })
+const props = defineProps({ brand: Object, canEdit: { type: Boolean, default: false } })
 
 const strategy = ref(null)
 const loaded = ref(false)
@@ -85,9 +86,9 @@ async function save() {
     <div v-else-if="!strategy" class="card empty-state rise">
       <h2>Маркетинговая стратегия ещё не создана</h2>
       <p>Опишите бренд — AI подготовит цели, KPI, аудиторию, позиционирование и план. Или заполните вручную.</p>
-      <div class="actions">
+      <div v-if="canEdit" class="actions">
         <button class="btn outline" @click="startManual">Заполнить вручную</button>
-        <button class="btn" @click="brief = brand.description; aiModal = true">✦ Сгенерировать с AI</button>
+        <button class="btn" @click="brief = brand.description; aiModal = true"><AppIcon name="sparkles" :size="16" /> Сгенерировать с AI</button>
       </div>
     </div>
 
@@ -98,9 +99,9 @@ async function save() {
           <div><i :style="{ width: completion + '%' }" /></div>
         </div>
         <div class="actions">
-          <button class="btn outline sm" @click="brief = brand.description; aiModal = true">✦ Перегенерировать</button>
+          <button v-if="canEdit" class="btn outline sm" @click="brief = brand.description; aiModal = true"><AppIcon name="sparkles" :size="16" /> Перегенерировать</button>
           <button class="btn soft sm" @click="downloadPdf(`/brands/${brand.id}/strategy/pdf/`, `Strategy_${brand.name}.pdf`)">↓ PDF</button>
-          <button class="btn sm" :disabled="saving" @click="save">{{ saving ? 'Сохраняем…' : 'Сохранить' }}</button>
+          <button v-if="canEdit" class="btn sm" :disabled="saving" @click="save">{{ saving ? 'Сохраняем…' : 'Сохранить' }}</button>
         </div>
       </div>
 
@@ -112,20 +113,20 @@ async function save() {
             <div class="items">
               <div v-for="(item, i) in strategy[f.key]" :key="f.key + i" class="item">
                 <textarea
-                  v-model="strategy[f.key][i]" class="textarea line" rows="1"
+                  v-model="strategy[f.key][i]" class="textarea line" rows="1" :readonly="!canEdit"
                   @input="$event.target.style.height = 'auto'; $event.target.style.height = $event.target.scrollHeight + 'px'"
                 />
-                <button class="btn ghost sm" @click="strategy[f.key].splice(i, 1)">✕</button>
+                <button v-if="canEdit" class="btn ghost sm" @click="strategy[f.key].splice(i, 1)"><AppIcon name="close" :size="15" /></button>
               </div>
             </div>
-            <button class="btn ghost sm add" @click="strategy[f.key].push('')">+ Добавить</button>
+            <button v-if="canEdit" class="btn ghost sm add" @click="strategy[f.key].push('')">+ Добавить</button>
           </section>
         </div>
         <div class="col">
           <section v-for="f in textFields" :key="f.key" class="card sec rise">
             <h3>{{ f.title }}</h3>
             <p class="section-hint">{{ f.hint }}</p>
-            <textarea v-model="strategy[f.key]" class="textarea" :rows="f.tall ? 12 : 4" />
+            <textarea v-model="strategy[f.key]" class="textarea" :rows="f.tall ? 12 : 4" :readonly="!canEdit" />
           </section>
         </div>
       </div>
@@ -146,7 +147,7 @@ async function save() {
         <button class="btn outline" @click="aiModal = false">Отмена</button>
         <button class="btn" :disabled="generating || !brief.trim()" @click="generate">
           <span v-if="generating" class="spinner" />
-          {{ generating ? 'Claude думает…' : '✦ Сгенерировать' }}
+          <AppIcon v-if="!generating" name="sparkles" :size="16" />{{ generating ? 'Claude думает…' : 'Сгенерировать' }}
         </button>
       </template>
     </AppModal>

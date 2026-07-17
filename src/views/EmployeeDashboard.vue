@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import api from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
 import KhanCoinIcon from '../components/KhanCoinIcon.vue'
+import AppIcon from '../components/AppIcon.vue'
 import { PRIORITY, TASK_STATUS, fmtDate } from '../labels'
 import { useAuthStore } from '../stores/auth'
 
@@ -34,7 +35,7 @@ const cards = [
 <template>
   <div>
     <h1 class="page-title">
-      Привет, {{ auth.user?.first_name || auth.user?.username }} 👋
+      Привет, {{ auth.user?.first_name || auth.user?.username }}
     </h1>
 
     <div v-if="!data" class="stats">
@@ -76,7 +77,7 @@ const cards = [
         </section>
 
         <section class="card panel rise" v-if="data.tasks_overdue.length">
-          <h2 class="danger-title">🔴 Просрочено — сначала это</h2>
+          <h2 class="danger-title"><AppIcon name="alert" :size="19" /> Просрочено — сначала это</h2>
           <div v-for="t in data.tasks_overdue" :key="t.id" class="trow">
             <div class="tinfo">
               <strong>{{ t.title }}</strong>
@@ -95,7 +96,7 @@ const cards = [
             </div>
             <span class="deadline">{{ fmtDate(t.deadline, true) }}</span>
           </div>
-          <p v-if="!data.tasks_today.length" class="empty">На сегодня дедлайнов нет 🎉</p>
+          <p v-if="!data.tasks_today.length" class="empty">На сегодня дедлайнов нет</p>
         </section>
 
         <section class="card panel rise wide">

@@ -2,22 +2,32 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../api'
+import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toasts'
 import AppModal from '../components/AppModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import AppIcon from '../components/AppIcon.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import SwotTab from '../components/brand/SwotTab.vue'
 import StrategyTab from '../components/brand/StrategyTab.vue'
 import ContentPlanTab from '../components/brand/ContentPlanTab.vue'
 import ReportTab from '../components/brand/ReportTab.vue'
-import { BRAND_STATUS, fmtDate, fmtMoney } from '../labels'
+import { BRAND_STATUS, allowPositiveIntegerKey, fmtDate, fmtMoney, positiveInteger } from '../labels'
 
 const route = useRoute()
+const auth = useAuthStore()
 const toasts = useToastStore()
 const brand = ref(null)
+const descriptionExpanded = ref(false)
 const tab = ref('overview')
 const users = ref([])
 const projectManagers = computed(() => users.value.filter((user) => ['admin', 'pm'].includes(user.role)))
+const canEditBrand = computed(() => auth.user?.role === 'admin'
+  || (auth.user?.role === 'pm' && Number(brand.value?.manager) === Number(auth.user?.id)))
+const canExpandDescription = computed(() => {
+  const description = brand.value?.description || ''
+  return description.length > 320 || description.split('\n').length > 5
+})
 
 const tabs = [
   { id: 'overview', label: 'Обзор' },
@@ -64,6 +74,7 @@ function openEdit() {
     manager: brand.value.manager,
     members: [...brand.value.members],
     start_date: brand.value.start_date,
+    duration_months: brand.value.duration_months || '',
     status: brand.value.status,
   })
   editModal.value = true
@@ -72,7 +83,12 @@ function openEdit() {
 async function saveEdit() {
   saving.value = true
   try {
-    await api.patch(`/brands/${brand.value.id}/`, form)
+    const payload = {
+      ...form,
+      duration_months: form.duration_months ? Number(form.duration_months) : null,
+    }
+    if (auth.user?.role !== 'admin') delete payload.manager
+    await api.patch(`/brands/${brand.value.id}/`, payload)
     editModal.value = false
     await load()
   } finally {
@@ -161,7 +177,7 @@ async function confirmResearch() {
       </div>
       <div class="head-actions">
         <StatusBadge :map="BRAND_STATUS" :value="brand.status" />
-        <button class="btn outline sm" @click="openEdit">✎ Редактировать</button>
+        <button v-if="canEditBrand" class="btn outline sm" @click="openEdit"><AppIcon name="edit" :size="16" /> Редактировать</button>
       </div>
     </div>
 
@@ -181,10 +197,14 @@ async function confirmResearch() {
               <h2>О бренде</h2>
               <span v-if="brand.researched_at" class="research-date">Данные проверены {{ fmtDate(brand.researched_at) }}</span>
             </div>
-            <button class="btn soft sm" @click="openResearch">✦ {{ brand.researched_at ? 'Данные и поиск' : 'Найти данные' }}</button>
+            <button v-if="canEditBrand" class="btn soft sm" @click="openResearch"><AppIcon name="sparkles" :size="16" /> {{ brand.researched_at ? 'Данные и поиск' : 'Найти данные' }}</button>
           </div>
           <div class="desc-block">
-            <p class="desc">{{ brand.description || 'Описание не заполнено — добавьте его: AI использует этот текст для SWOT и стратегии' }}</p>
+            <p class="desc" :class="{ clamped: canExpandDescription && !descriptionExpanded }">{{ brand.description || 'Описание не заполнено — добавьте его: AI использует этот текст для SWOT и стратегии' }}</p>
+            <button v-if="canExpandDescription" type="button" class="desc-toggle" @click="descriptionExpanded = !descriptionExpanded">
+              {{ descriptionExpanded ? 'Свернуть' : 'Показать полностью' }}
+              <AppIcon name="chevron-down" :size="17" :class="{ rotated: descriptionExpanded }" />
+            </button>
           </div>
 
           <div class="info-grid">
@@ -231,6 +251,13 @@ async function confirmResearch() {
             </div>
 
             <div class="info-item">
+              <span class="info-icon" style="--tone: var(--sky); --tone-bg: var(--sky-soft)">
+                <AppIcon name="clock" :size="22" />
+              </span>
+              <div><span class="info-label">Срок проекта</span><span class="info-value">{{ brand.duration_months ? `${brand.duration_months} мес.` : '—' }}</span></div>
+            </div>
+
+            <div class="info-item">
               <span class="info-icon" style="--tone: var(--red); --tone-bg: var(--red-soft)">
                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
               </span>
@@ -262,14 +289,14 @@ async function confirmResearch() {
             <UserAvatar :user="m" :size="34" />
             <div><strong>{{ m.full_name }}</strong><span class="muted">{{ m.position }}</span></div>
           </div>
-          <button class="btn ghost sm" style="margin-top: 8px" @click="openEdit">+ Изменить состав</button>
+          <button v-if="canEditBrand" class="btn ghost sm" style="margin-top: 8px" @click="openEdit">+ Изменить состав</button>
         </div>
       </div>
 
-      <SwotTab v-else-if="tab === 'swot'" key="swot" :brand="brand" />
-      <StrategyTab v-else-if="tab === 'strategy'" key="strategy" :brand="brand" />
-      <ContentPlanTab v-else-if="tab === 'content'" key="content" :brand="brand" />
-      <ReportTab v-else key="report" :brand="brand" />
+      <SwotTab v-else-if="tab === 'swot'" key="swot" :brand="brand" :can-edit="canEditBrand" />
+      <StrategyTab v-else-if="tab === 'strategy'" key="strategy" :brand="brand" :can-edit="canEditBrand" />
+      <ContentPlanTab v-else-if="tab === 'content'" key="content" :brand="brand" :can-edit="canEditBrand" />
+      <ReportTab v-else-if="tab === 'report'" key="report" :brand="brand" />
     </Transition>
 
     <!-- ===== редактирование бренда ===== -->
@@ -297,8 +324,9 @@ async function confirmResearch() {
           <div><label class="field">Email</label><input v-model="form.contact_email" type="email" class="input" /></div>
           <div><label class="field">Дата начала</label><input v-model="form.start_date" type="date" class="input" /></div>
         </div>
-        <div>
-          <label class="field">Project Manager</label>
+        <div><label class="field">Срок проекта, месяцев</label><input :value="form.duration_months" class="input" inputmode="numeric" maxlength="3" placeholder="Например 6" @keydown="allowPositiveIntegerKey" @input="$event.target.value = form.duration_months = positiveInteger($event.target.value)" /></div>
+          <div v-if="auth.user?.role === 'admin'">
+            <label class="field">Project Manager</label>
           <select v-model="form.manager" class="select">
             <option :value="null">—</option>
             <option v-for="u in projectManagers" :key="u.id" :value="u.id">{{ u.full_name }}</option>
@@ -326,7 +354,7 @@ async function confirmResearch() {
     <AppModal :open="researchModal" title="Поиск данных о бренде" width="820px" @close="researchModal = false">
       <div v-if="!researchDraft" class="research-start">
         <div class="research-hero">
-          <span class="research-icon">✦</span>
+          <span class="research-icon"><AppIcon name="sparkles" :size="22" /></span>
           <div>
             <h3>AI изучит открытые источники</h3>
             <p>Будут проверены официальный сайт, социальные сети, каталоги и публикации. Результат появится как черновик на узбекском языке латиницей и не изменит бренд без вашего подтверждения.</p>
@@ -405,7 +433,7 @@ async function confirmResearch() {
         <button class="btn outline" @click="researchModal = false">Отмена</button>
         <button v-if="researchDraft" class="btn soft" :disabled="researching" @click="runResearch">{{ researching ? 'Ищем и проверяем…' : '↻ Найти заново' }}</button>
         <button v-if="!researchDraft" class="btn" :disabled="researching" @click="runResearch">
-          <span v-if="researching" class="spinner" />{{ researching ? 'Ищем и проверяем…' : '✦ Начать поиск' }}
+          <span v-if="researching" class="spinner" /><AppIcon v-else name="sparkles" :size="16" />{{ researching ? 'Ищем и проверяем…' : 'Начать поиск' }}
         </button>
         <button v-else class="btn" :disabled="confirmingResearch" @click="confirmResearch">
           {{ confirmingResearch ? 'Сохраняем и создаём SWOT…' : 'Подтвердить данные' }}
@@ -459,6 +487,30 @@ async function confirmResearch() {
   margin-bottom: 18px;
 }
 .desc { color: var(--ink-2); font-size: 0.92rem; white-space: pre-line; line-height: 1.55; }
+.desc.clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+}
+.desc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 9px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), color var(--dur-fast) ease;
+}
+.desc-toggle:active { transform: scale(0.97); }
+.desc-toggle .app-icon { transition: transform 180ms var(--ease-out); }
+.desc-toggle .app-icon.rotated { transform: rotate(180deg); }
 
 .info-grid {
   display: grid;

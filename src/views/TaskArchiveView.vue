@@ -2,10 +2,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import api from '../api'
 import AppModal from '../components/AppModal.vue'
-import StatusBadge from '../components/StatusBadge.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import { useAuthStore } from '../stores/auth'
-import { PRIORITY, TASK_STATUS, fmtDate } from '../labels'
+import { TASK_STATUS, fmtDate } from '../labels'
 
 const auth = useAuthStore()
 const items = ref(null)
@@ -97,7 +96,7 @@ onMounted(load)
         <thead>
           <tr>
             <th>Задача</th><th>Бренд</th><th>Исполнитель</th>
-            <th>Дедлайн</th><th>Выполнено</th><th>Приоритет</th><th>Результат</th>
+            <th>Дедлайн</th><th>Выполнено</th><th>Результат</th>
           </tr>
         </thead>
         <tbody>
@@ -113,7 +112,6 @@ onMounted(load)
             </td>
             <td>{{ fmtDate(task.deadline, true) }}</td>
             <td>{{ fmtDate(task.completed_at, true) }}</td>
-            <td><StatusBadge :map="PRIORITY" :value="task.priority" /></td>
             <td :class="task.coins_result < 0 ? 'negative' : 'positive'">
               {{ task.coins_result ? Number(task.coins_result).toLocaleString('ru-RU') : '—' }}
             </td>
@@ -126,8 +124,7 @@ onMounted(load)
     <AppModal :open="!!detail" :title="detail?.title" width="760px" @close="detail = null">
       <div v-if="detail" class="detail-body">
         <div class="detail-statuses">
-          <StatusBadge :map="TASK_STATUS" :value="detail.status" />
-          <StatusBadge :map="PRIORITY" :value="detail.priority" />
+          <span class="badge" :style="{ color: TASK_STATUS[detail.status]?.color, background: TASK_STATUS[detail.status]?.bg }">{{ TASK_STATUS[detail.status]?.label }}</span>
         </div>
 
         <div class="detail-grid">
@@ -203,10 +200,10 @@ onMounted(load)
 .reset { white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
 table {
-  --archive-columns: minmax(220px, 2fr) minmax(120px, 0.9fr) minmax(190px, 1.35fr) 145px 145px 115px 105px;
+  --archive-columns: minmax(220px, 2fr) minmax(120px, 0.9fr) minmax(190px, 1.35fr) 145px 145px 105px;
   display: block;
   width: 100%;
-  min-width: 1080px;
+  min-width: 950px;
   border-collapse: collapse;
   font-size: 0.88rem;
 }

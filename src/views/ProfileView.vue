@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import api from '../api'
 import UserAvatar from '../components/UserAvatar.vue'
+import AppIcon from '../components/AppIcon.vue'
 import { ROLE } from '../labels'
 import { useAuthStore } from '../stores/auth'
 import { useThemeStore } from '../stores/theme'
@@ -145,7 +146,7 @@ async function save() {
       <p v-if="error" class="error">{{ error }}</p>
       <div class="foot">
         <Transition name="modal">
-          <span v-if="saved" class="saved">✓ Сохранено</span>
+          <span v-if="saved" class="saved"><AppIcon name="check" :size="16" /> Сохранено</span>
         </Transition>
         <button class="btn" :disabled="saving">{{ saving ? 'Сохраняем…' : 'Сохранить' }}</button>
       </div>

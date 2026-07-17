@@ -1,8 +1,10 @@
 <script setup>
+import AppIcon from './AppIcon.vue'
 defineProps({
   open: Boolean,
   title: String,
   width: { type: String, default: '540px' },
+  solid: { type: Boolean, default: false },
 })
 const emit = defineEmits(['close'])
 </script>
@@ -11,11 +13,11 @@ const emit = defineEmits(['close'])
   <Teleport to="body">
     <Transition name="modal" :duration="{ enter: 250, leave: 140 }">
       <!-- закрытие только явными кнопками — клик по фону игнорируется -->
-      <div v-if="open" class="overlay">
-        <div class="modal-box card" :style="{ maxWidth: width }" role="dialog" aria-modal="true">
+      <div v-if="open" class="overlay" :class="{ solid }">
+        <div class="modal-box card" :class="{ solid }" :style="{ maxWidth: width }" role="dialog" aria-modal="true">
           <header>
             <h3>{{ title }}</h3>
-            <button class="btn ghost sm" aria-label="Закрыть" @click="emit('close')">✕</button>
+            <button class="btn ghost sm" aria-label="Закрыть" @click="emit('close')"><AppIcon name="close" :size="17" /></button>
           </header>
           <div class="body"><slot /></div>
           <footer v-if="$slots.footer"><slot name="footer" /></footer>
@@ -49,6 +51,16 @@ const emit = defineEmits(['close'])
   -webkit-backdrop-filter: blur(36px) saturate(180%);
   /* модалка не привязана к триггеру — origin остаётся center */
 }
+.overlay.solid {
+  background: rgb(0 0 0 / 0.38);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.modal-box.solid {
+  background: var(--surface-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 header {
   display: flex;
   align-items: center;
@@ -57,7 +69,7 @@ header {
   border-bottom: 0.5px solid var(--line);
 }
 h3 { font-size: 1.08rem; font-weight: 650; }
-.body { padding: 18px 20px; overflow-y: auto; }
+.body { padding: 18px 20px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 footer {
   padding: 12px 20px 16px;
   border-top: 0.5px solid var(--line);

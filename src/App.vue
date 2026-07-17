@@ -67,6 +67,7 @@ onUnmounted(() => {
 const ICONS = {
   dashboard: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z',
   brands: 'M12 2 2 7v10l10 5 10-5V7L12 2zm0 2.2L19.5 8 12 11.8 4.5 8 12 4.2zM4 9.6l7 3.5v6.7l-7-3.5V9.6zm9 10.2v-6.7l7-3.5v6.7l-7 3.5z',
+  finances: 'M3 5a2 2 0 0 1 2-2h13v3h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5Zm2 3v11h14v-3h-4a3 3 0 0 1 0-6h4V8H5Zm10 4a1 1 0 1 0 0 2h4v-2h-4Z',
   tasks: 'M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z',
   content: 'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm0 4v10h16V8H4zm2 3h6v2H6v-2zm0 3h9v2H6v-2z',
   team: 'M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z',
@@ -86,6 +87,7 @@ const nav = computed(() => {
   return [
     { to: '/', label: 'Дашборд', icon: ICONS.dashboard },
     { to: '/brands', label: 'Бренды', icon: ICONS.brands },
+    { to: '/finances', label: 'Финансы', icon: ICONS.finances },
     { to: '/tasks', label: 'Задачи', icon: ICONS.tasks },
     { to: '/team', label: 'Команда', icon: ICONS.team },
     { to: '/profile', label: 'Профиль', icon: ICONS.profile },

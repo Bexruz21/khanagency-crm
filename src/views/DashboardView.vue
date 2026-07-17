@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import api from '../api'
 import UserAvatar from '../components/UserAvatar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import AppIcon from '../components/AppIcon.vue'
 import EmployeeDashboard from './EmployeeDashboard.vue'
 import { PRIORITY, TASK_STATUS, fmtDate } from '../labels'
 import { useAuthStore } from '../stores/auth'
@@ -91,14 +92,14 @@ const statCards = [
         </section>
 
         <section class="card panel rise wide" v-if="data.tasks_overdue.length">
-          <header><h2 class="danger-title">🔴 Просроченные задачи</h2></header>
+          <header><h2 class="danger-title"><AppIcon name="alert" :size="19" /> Просроченные задачи</h2></header>
           <TaskRow v-for="t in data.tasks_overdue" :key="t.id" :task="t" />
         </section>
 
         <section class="card panel rise wide">
           <header><h2>Сегодня</h2></header>
           <TaskRow v-for="t in data.tasks_today" :key="t.id" :task="t" />
-          <p v-if="!data.tasks_today.length" class="empty">На сегодня дедлайнов нет 🎉</p>
+          <p v-if="!data.tasks_today.length" class="empty">На сегодня дедлайнов нет</p>
         </section>
 
         <section class="card panel rise wide">

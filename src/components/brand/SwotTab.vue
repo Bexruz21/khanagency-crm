@@ -2,8 +2,9 @@
 import { onMounted, ref } from 'vue'
 import api, { downloadPdf } from '../../api'
 import AppModal from '../AppModal.vue'
+import AppIcon from '../AppIcon.vue'
 
-const props = defineProps({ brand: Object })
+const props = defineProps({ brand: Object, canEdit: { type: Boolean, default: false } })
 
 const swot = ref(null)
 const loaded = ref(false)
@@ -68,20 +69,20 @@ async function save() {
     <div v-else-if="!swot" class="card empty-state rise">
       <h2>SWOT-анализ ещё не создан</h2>
       <p>Заполните вручную или доверьте первый черновик AI — потом всё можно отредактировать.</p>
-      <div class="actions">
+      <div v-if="canEdit" class="actions">
         <button class="btn outline" @click="startManual">Заполнить вручную</button>
-        <button class="btn" @click="brief = brand.description; aiModal = true">✦ Сгенерировать с AI</button>
+        <button class="btn" @click="brief = brand.description; aiModal = true"><AppIcon name="sparkles" :size="16" /> Сгенерировать с AI</button>
       </div>
     </div>
 
     <div v-else>
       <div class="toolbar">
-        <span v-if="swot.generated_by_ai" class="badge ai-badge">✦ создан AI — отредактируйте под себя</span>
+        <span v-if="swot.generated_by_ai" class="badge ai-badge"><AppIcon name="sparkles" :size="14" /> создан AI — отредактируйте под себя</span>
         <span v-else />
         <div class="actions">
-          <button class="btn outline sm" @click="brief = brand.description; aiModal = true">✦ Перегенерировать</button>
+          <button v-if="canEdit" class="btn outline sm" @click="brief = brand.description; aiModal = true"><AppIcon name="sparkles" :size="16" /> Перегенерировать</button>
           <button class="btn soft sm" @click="downloadPdf(`/brands/${brand.id}/swot/pdf/`, `SWOT_${brand.name}.pdf`)">↓ PDF</button>
-          <button class="btn sm" :disabled="saving" @click="save">{{ saving ? 'Сохраняем…' : 'Сохранить' }}</button>
+          <button v-if="canEdit" class="btn sm" :disabled="saving" @click="save">{{ saving ? 'Сохраняем…' : 'Сохранить' }}</button>
         </div>
       </div>
 
@@ -92,13 +93,13 @@ async function save() {
           <TransitionGroup name="flip" tag="div" class="items">
             <div v-for="(item, i) in swot[s.key]" :key="s.key + i" class="item flip-move">
               <textarea
-                v-model="swot[s.key][i]" class="textarea line" rows="1"
+                v-model="swot[s.key][i]" class="textarea line" rows="1" :readonly="!canEdit"
                 @input="$event.target.style.height = 'auto'; $event.target.style.height = $event.target.scrollHeight + 'px'"
               />
-              <button class="btn ghost sm" title="Удалить" @click="swot[s.key].splice(i, 1)">✕</button>
+              <button v-if="canEdit" class="btn ghost sm" title="Удалить" @click="swot[s.key].splice(i, 1)"><AppIcon name="close" :size="15" /></button>
             </div>
           </TransitionGroup>
-          <button class="btn ghost sm add" @click="swot[s.key].push('')">+ Добавить пункт</button>
+          <button v-if="canEdit" class="btn ghost sm add" @click="swot[s.key].push('')">+ Добавить пункт</button>
         </section>
       </div>
     </div>
@@ -118,7 +119,7 @@ async function save() {
         <button class="btn outline" @click="aiModal = false">Отмена</button>
         <button class="btn" :disabled="generating || !brief.trim()" @click="generate">
           <span v-if="generating" class="spinner" />
-          {{ generating ? 'Claude думает…' : '✦ Сгенерировать' }}
+          <AppIcon v-if="!generating" name="sparkles" :size="16" />{{ generating ? 'Claude думает…' : 'Сгенерировать' }}
         </button>
       </template>
     </AppModal>

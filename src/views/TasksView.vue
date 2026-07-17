@@ -2,12 +2,15 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import api, { downloadPdf } from '../api'
 import AppModal from '../components/AppModal.vue'
+import AppIcon from '../components/AppIcon.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import UserAvatar from '../components/UserAvatar.vue'
-import { PRIORITY, TASK_STATUS, compactDateTime, fmtDate, maskCompactDateTime } from '../labels'
+import { PRIORITY, TASK_STATUS, allowCompactDateKey, compactDateTime, fmtDate, maskCompactDateTime } from '../labels'
 import { useAuthStore } from '../stores/auth'
+import { useToastStore } from '../stores/toasts'
 
 const auth = useAuthStore()
+const toasts = useToastStore()
 const isEmployee = computed(() => auth.user?.role === 'employee')
 
 const tasks = ref(null)
@@ -26,10 +29,13 @@ const columns = [
 // --- модалки ---
 const createModal = ref(false)
 const saving = ref(false)
-const blank = { title: '', description: '', brand: null, assignee: null, deadline: '', priority: 'medium', priority_mode: 'manual', status: 'todo' }
+const blank = { title: '', description: '', brand: null, assignee: null, deadline: '', status: 'todo' }
 const form = reactive({ ...blank })
 
 const detail = ref(null)       // подробная задача
+const detailDeadline = ref('')
+const deadlineEditing = ref(false)
+const deadlineSaving = ref(false)
 const commentText = ref('')
 const fileInput = ref(null)
 const detailOpeningId = ref(null)
@@ -70,6 +76,7 @@ async function syncFromServer() {
     if (detail.value) {
       const { data } = await api.get(`/tasks/${detail.value.id}/`)
       detail.value = data
+      if (!deadlineEditing.value) detailDeadline.value = compactDateTime(data.deadline)
     }
   } finally {
     syncInFlight = false
@@ -81,7 +88,7 @@ const byColumn = computed(() => {
   for (const t of tasks.value || []) {
     if (!map[t.status]) continue
     // Выполненные остаются на доске до конца текущего дня, затем доступны в архиве.
-    if (t.status === 'done' && !isToday(t.completed_at)) continue
+    if (t.status === 'done' && (t.archived_at || !isToday(t.completed_at))) continue
     map[t.status].push(t)
   }
   return map
@@ -104,7 +111,7 @@ async function onDrop(status) {
   if (isEmployee.value) return
   const task = tasks.value.find((t) => t.id === dragId.value)
   dragOver.value = ''
-  if (!task || task.status === status) return
+  if (!task || task.status === 'done' || task.status === status) return
   const prev = task.status
   task.status = status // оптимистично — интерфейс отвечает мгновенно
   try {
@@ -151,7 +158,10 @@ async function openDetail(task) {
   try {
     const { data } = await api.get(`/tasks/${task.id}/`)
     // Если пользователь успел уйти со страницы, устаревший ответ не открывает окно.
-    if (detailOpeningId.value === task.id) detail.value = data
+    if (detailOpeningId.value === task.id) {
+      detail.value = data
+      detailDeadline.value = compactDateTime(data.deadline)
+    }
   } finally {
     if (detailOpeningId.value === task.id) detailOpeningId.value = null
   }
@@ -160,12 +170,44 @@ async function openDetail(task) {
 async function refreshDetail() {
   const { data } = await api.get(`/tasks/${detail.value.id}/`)
   detail.value = data
+  if (!deadlineEditing.value) detailDeadline.value = compactDateTime(data.deadline)
   await load()
+}
+
+async function saveDetailDeadline() {
+  if (!detail.value || deadlineSaving.value) return
+  const next = detailDeadline.value || null
+  if (next === compactDateTime(detail.value.deadline)) {
+    deadlineEditing.value = false
+    return
+  }
+  deadlineSaving.value = true
+  try {
+    await api.patch(`/tasks/${detail.value.id}/`, { deadline: next })
+    deadlineEditing.value = false
+    await refreshDetail()
+  } finally {
+    deadlineSaving.value = false
+  }
+}
+
+function closeDetail() {
+  deadlineEditing.value = false
+  detailDeadline.value = ''
+  detail.value = null
 }
 
 async function patchDetail(fields) {
   await api.patch(`/tasks/${detail.value.id}/`, fields)
   await refreshDetail()
+}
+
+async function archiveDetail() {
+  if (!detail.value || detail.value.status !== 'done') return
+  await api.post(`/tasks/${detail.value.id}/archive/`)
+  toasts.push('Задача отправлена в архив.', 'success')
+  closeDetail()
+  await load()
 }
 
 async function addComment() {
@@ -237,13 +279,13 @@ function fileName(url) {
           <article
             v-for="t in byColumn[col.id]" :key="t.id"
             class="card task flip-move"
-            :draggable="!isEmployee"
+            :draggable="!isEmployee && t.status !== 'done'"
             @dragstart="onDragStart(t.id)"
             @dragend="onDragEnd"
             @click="openDetail(t)"
           >
             <div class="task-top">
-              <StatusBadge :map="PRIORITY" :value="t.priority" />
+              <StatusBadge v-if="t.status !== 'done'" :map="PRIORITY" :value="t.priority" />
               <span v-if="t.is_overdue" class="badge" style="background: var(--red-soft); color: var(--red)">просрочено</span>
             </div>
             <h4>{{ t.title }}</h4>
@@ -251,7 +293,7 @@ function fileName(url) {
             <div class="task-bottom">
               <UserAvatar :user="t.assignee_detail" :size="24" />
               <span class="dl" :class="{ red: t.is_overdue }">{{ fmtDate(t.deadline, true) }}</span>
-              <span v-if="t.comments_count" class="cmt">💬 {{ t.comments_count }}</span>
+              <span v-if="t.comments_count" class="cmt"><AppIcon name="message" :size="14" /> {{ t.comments_count }}</span>
             </div>
           </article>
         </TransitionGroup>
@@ -280,20 +322,8 @@ function fileName(url) {
           </div>
         </div>
         <div class="row2">
-          <div><label class="field">Дедлайн</label><input :value="form.deadline" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @input="form.deadline = maskCompactDateTime($event.target.value)" /></div>
-          <div>
-            <label class="field">Приоритет</label>
-            <div class="prio-row">
-              <select v-model="form.priority" class="select" :disabled="form.priority_mode === 'auto'">
-                <option v-for="(v, k) in PRIORITY" :key="k" :value="k">{{ v.label }}</option>
-              </select>
-              <div class="mode-switch">
-                <button type="button" :class="{ on: form.priority_mode === 'manual' }" @click="form.priority_mode = 'manual'">Ручной</button>
-                <button type="button" :class="{ on: form.priority_mode === 'auto' }" @click="form.priority_mode = 'auto'">Авто</button>
-              </div>
-            </div>
-            <p v-if="form.priority_mode === 'auto'" class="mode-hint">Приоритет будет расти сам по мере приближения дедлайна</p>
-          </div>
+          <div><label class="field">Дедлайн</label><input :value="form.deadline" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.deadline = maskCompactDateTime($event.target.value)" /></div>
+          <div class="auto-priority-note"><span class="auto-mark">A</span><div><strong>Приоритет рассчитывается автоматически</strong><small>Он повышается по мере приближения дедлайна</small></div></div>
         </div>
       </div>
       <template #footer>
@@ -303,7 +333,7 @@ function fileName(url) {
     </AppModal>
 
     <!-- ===== детали ===== -->
-    <AppModal :open="!!detail" :title="detail?.title || ''" width="680px" @close="detail = null">
+    <AppModal :open="!!detail" :title="detail?.title || ''" width="680px" @close="closeDetail">
       <div v-if="detail" class="detail">
         <!-- workflow: сотрудник ведёт задачу до проверки, менеджер одобряет -->
         <div v-if="isEmployee" class="workflow">
@@ -311,36 +341,43 @@ function fileName(url) {
             <button class="btn" @click="setDetailStatus('in_progress')">▶ Взять в работу</button>
           </template>
           <template v-else-if="detail.status === 'in_progress'">
-            <button class="btn" style="background: var(--violet)" @click="setDetailStatus('review')">🟣 Отправить на проверку</button>
+            <button class="btn" style="background: var(--violet)" @click="setDetailStatus('review')"><AppIcon name="review" :size="17" /> Отправить на проверку</button>
           </template>
           <template v-else-if="detail.status === 'review'">
-            <span class="wf-note violet">🟣 Задача на проверке у менеджера — ждите решения</span>
+            <span class="wf-note violet"><AppIcon name="review" :size="17" /> Задача на проверке у менеджера — ждите решения</span>
           </template>
           <template v-else-if="detail.status === 'done'">
-            <span class="wf-note green">✓ Задача принята менеджером</span>
+            <span class="wf-note green"><AppIcon name="check" :size="17" /> Задача принята менеджером</span>
           </template>
         </div>
 
         <div v-else-if="detail.status === 'review'" class="workflow manager">
           <span class="wf-note violet">Сотрудник отправил задачу на проверку</span>
-          <button class="btn" style="background: var(--green)" @click="setDetailStatus('done')">✓ Принять</button>
-          <button class="btn outline" @click="setDetailStatus('in_progress')">✏ Вернуть на доработку</button>
+          <button class="btn" style="background: var(--green)" @click="setDetailStatus('done')"><AppIcon name="check" :size="17" /> Принять</button>
+          <button class="btn outline" @click="setDetailStatus('in_progress')"><AppIcon name="edit" :size="17" /> Вернуть на доработку</button>
+        </div>
+
+        <div v-if="detail.status === 'done'" class="workflow archive-workflow">
+          <span v-if="!isEmployee" class="wf-note green"><AppIcon name="check" :size="17" /> Выполненная задача останется сегодня или может быть архивирована сейчас</span>
+          <button class="btn outline" @click="archiveDetail"><AppIcon name="archive" :size="17" /> В архив</button>
         </div>
 
         <div v-if="!isEmployee" class="detail-controls">
           <div>
             <label class="field">Дедлайн</label>
             <input class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ"
-              :value="compactDateTime(detail.deadline)"
-              @change="patchDetail({ deadline: maskCompactDateTime($event.target.value) || null })" />
+              :value="detailDeadline" :disabled="deadlineSaving"
+              @focus="deadlineEditing = true" @keydown="allowCompactDateKey"
+              @input="$event.target.value = detailDeadline = maskCompactDateTime($event.target.value)"
+              @blur="saveDetailDeadline" @keydown.enter="$event.target.blur()" />
           </div>
           <div>
             <label class="field">Статус</label>
-            <select class="select" :value="detail.status" @change="patchDetail({ status: $event.target.value })">
+            <select class="select" :value="detail.status" :disabled="detail.status === 'done'" @change="patchDetail({ status: $event.target.value })">
               <option v-for="(v, k) in TASK_STATUS" :key="k" :value="k">{{ v.label }}</option>
             </select>
           </div>
-          <div>
+          <div v-if="detail.status !== 'done'">
             <label class="field">Исполнитель</label>
             <select class="select" :value="detail.assignee" @change="patchDetail({ assignee: $event.target.value || null })">
               <option :value="null">—</option>
@@ -349,16 +386,7 @@ function fileName(url) {
           </div>
           <div>
             <label class="field">Приоритет</label>
-            <select class="select" :value="detail.priority" :disabled="detail.priority_mode === 'auto'"
-              @change="patchDetail({ priority: $event.target.value })">
-              <option v-for="(v, k) in PRIORITY" :key="k" :value="k">{{ v.label }}</option>
-            </select>
-            <div class="mode-switch" style="margin-top: 6px">
-              <button type="button" :class="{ on: detail.priority_mode === 'manual' }"
-                @click="patchDetail({ priority_mode: 'manual' })">Ручной</button>
-              <button type="button" :class="{ on: detail.priority_mode === 'auto' }"
-                @click="patchDetail({ priority_mode: 'auto' })">Авто</button>
-            </div>
+            <div class="auto-priority-value"><StatusBadge :map="PRIORITY" :value="detail.priority" /><span>Автоматически</span></div>
           </div>
         </div>
 
@@ -372,7 +400,7 @@ function fileName(url) {
         <h4>Файлы</h4>
         <div class="files">
           <a v-for="a in detail.attachments" :key="a.id" :href="a.file" target="_blank" class="file-chip">
-            📎 {{ fileName(a.file) }}
+            <AppIcon name="paperclip" :size="16" /> {{ fileName(a.file) }}
           </a>
           <button class="btn outline sm" @click="fileInput.click()">+ Файл</button>
           <input ref="fileInput" type="file" hidden @change="uploadFile" />
@@ -460,29 +488,12 @@ function fileName(url) {
 .form { display: flex; flex-direction: column; gap: 13px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-.prio-row { display: flex; gap: 8px; align-items: center; }
-.prio-row .select { flex: 1; }
-.mode-switch {
-  display: inline-flex;
-  gap: 2px;
-  background: var(--sunken);
-  border-radius: 8px;
-  padding: 2px;
-  flex: none;
-}
-.mode-switch button {
-  border: 0;
-  background: transparent;
-  padding: 6px 11px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--ink-2);
-  cursor: pointer;
-  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
-}
-.mode-switch button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
-.mode-hint { font-size: 0.76rem; color: var(--muted); margin-top: 5px; }
+.auto-priority-note { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 8px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunken); }
+.auto-priority-note strong, .auto-priority-note small { display: block; }
+.auto-priority-note strong { font-size: .78rem; }.auto-priority-note small { margin-top: 2px; color: var(--muted); font-size: .68rem; }
+.auto-mark { display: grid; width: 24px; height: 24px; flex: none; place-items: center; border-radius: 7px; background: var(--accent-soft); color: var(--accent); font-size: .7rem; font-weight: 800; }
+.auto-priority-value { display: flex; min-height: 40px; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--sunken); }
+.auto-priority-value > span { color: var(--muted); font-size: .7rem; font-weight: 650; }
 
 .detail h4 { font-size: 0.88rem; margin: 18px 0 8px; color: var(--ink-2); }
 .workflow {
@@ -538,9 +549,6 @@ function fileName(url) {
   .column { min-height: 120px; padding: 9px; }
   .task { padding: 14px; }
   .row2, .detail-controls { grid-template-columns: 1fr; }
-  .prio-row { align-items: stretch; flex-direction: column; }
-  .mode-switch { width: 100%; }
-  .mode-switch button { flex: 1; min-height: 40px; }
   .workflow { align-items: stretch; padding: 12px; }
   .workflow .btn { width: 100%; }
   .workflow.manager .wf-note { width: 100%; }

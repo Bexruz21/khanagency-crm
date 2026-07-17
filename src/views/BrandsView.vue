@@ -1,12 +1,14 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import api from '../api'
+import { useAuthStore } from '../stores/auth'
 import AppModal from '../components/AppModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import UserAvatar from '../components/UserAvatar.vue'
-import { BRAND_STATUS, fmtMoney } from '../labels'
+import { BRAND_STATUS, allowPositiveIntegerKey, fmtMoney, positiveInteger } from '../labels'
 
 const brands = ref(null)
+const auth = useAuthStore()
 const users = ref([])
 const modal = ref(false)
 const saving = ref(false)
@@ -15,7 +17,7 @@ const projectManagers = computed(() => users.value.filter((user) => ['admin', 'p
 const form = reactive({
   name: '', niche: '', description: '',
   contact_name: '', contact_phone: '', contact_email: '',
-  budget: null, manager: null, members: [], start_date: null, status: 'active',
+  budget: null, manager: null, members: [], start_date: null, duration_months: '', status: 'active',
 })
 
 async function load() {
@@ -28,9 +30,9 @@ onMounted(load)
 async function save() {
   saving.value = true
   try {
-    await api.post('/brands/', form)
+    await api.post('/brands/', { ...form, duration_months: form.duration_months ? Number(form.duration_months) : null })
     modal.value = false
-    Object.assign(form, { name: '', niche: '', description: '', contact_name: '', contact_phone: '', contact_email: '', budget: null, manager: null, members: [], start_date: null, status: 'active' })
+    Object.assign(form, { name: '', niche: '', description: '', contact_name: '', contact_phone: '', contact_email: '', budget: null, manager: null, members: [], start_date: null, duration_months: '', status: 'active' })
     await load()
   } finally {
     saving.value = false
@@ -42,7 +44,7 @@ async function save() {
   <div>
     <div class="head">
       <h1 class="page-title" style="margin: 0">Бренды</h1>
-      <button class="btn" @click="modal = true">+ Новый бренд</button>
+      <button v-if="auth.user?.role === 'admin'" class="btn" @click="modal = true">+ Новый бренд</button>
     </div>
 
     <div v-if="!brands" class="cards">
@@ -80,7 +82,7 @@ async function save() {
       </RouterLink>
     </div>
 
-    <AppModal :open="modal" title="Новый бренд" width="600px" @close="modal = false">
+    <AppModal :open="modal && auth.user?.role === 'admin'" title="Новый бренд" width="600px" @close="modal = false">
       <form class="form" @submit.prevent="save">
         <div class="row2">
           <div><label class="field">Название *</label><input v-model="form.name" class="input" required /></div>
@@ -104,6 +106,9 @@ async function save() {
             </select>
           </div>
           <div><label class="field">Дата начала</label><input v-model="form.start_date" type="date" class="input" /></div>
+        </div>
+        <div class="row2">
+          <div><label class="field">Срок проекта, месяцев</label><input :value="form.duration_months" class="input" inputmode="numeric" maxlength="3" placeholder="Например 6" @keydown="allowPositiveIntegerKey" @input="$event.target.value = form.duration_months = positiveInteger($event.target.value)" /></div>
         </div>
         <div>
           <label class="field">Команда проекта</label>

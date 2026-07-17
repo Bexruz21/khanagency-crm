@@ -2,15 +2,16 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import api, { downloadPdf } from '../../api'
 import AppModal from '../AppModal.vue'
+import AppIcon from '../AppIcon.vue'
 import StatusBadge from '../StatusBadge.vue'
 import UserAvatar from '../UserAvatar.vue'
-import { CONTENT_FORMAT, CONTENT_STATUS, PRIORITY, compactDateTime, fmtDate, maskCompactDateTime } from '../../labels'
+import { CONTENT_FORMAT, CONTENT_STATUS, PRIORITY, allowCompactDateKey, compactDateTime, fmtDate, maskCompactDateTime } from '../../labels'
 
-const props = defineProps({ brand: Object })
+const props = defineProps({ brand: Object, canEdit: { type: Boolean, default: false } })
 
 const items = ref(null)
-const users = ref([])
 const filterStatus = ref('')
+const teamUsers = computed(() => props.brand.members_detail || [])
 
 // --- модалка записи (создание/редактирование) ---
 const itemModal = ref(false)
@@ -23,6 +24,88 @@ const blank = {
   status: 'idea', comments: '',
 }
 const form = reactive({ ...blank })
+
+const DESCRIPTION_TEMPLATES = {
+  reels: `Цель ролика:
+Основная идея:
+Хронометраж:
+
+СЦЕНАРИЙ СЪЁМКИ
+Кадр 1 — Hook (0–3 сек.)
+Изображение / действие:
+Текст / реплика:
+План и движение камеры:
+
+Кадр 2
+Изображение / действие:
+Текст / реплика:
+План и движение камеры:
+
+Кадр 3
+Изображение / действие:
+Текст / реплика:
+План и движение камеры:
+
+Финальный кадр и CTA:
+
+МОНТАЖ
+Темп и переходы:
+Музыка / звуки:
+Титры и графика:
+
+Реквизит и локация:
+Референсы:
+Дополнительные примечания:`,
+  post: `Цель публикации:
+Основная мысль:
+Целевая аудитория:
+
+СТРУКТУРА ПОСТА
+Заголовок / Hook:
+Основной текст:
+Ключевые тезисы:
+CTA:
+
+ВИЗУАЛ
+Формат и композиция:
+Текст на макете:
+Цвета / стиль:
+Референсы:
+
+Дополнительные примечания:`,
+  stories: `Цель серии Stories:
+Количество экранов:
+
+ЭКРАН 1 — Hook
+Визуал / действие:
+Текст:
+
+ЭКРАН 2
+Визуал / действие:
+Текст:
+
+ЭКРАН 3
+Визуал / действие:
+Текст:
+
+Интерактивный элемент:
+Финальный CTA:
+Музыка / оформление:
+Дополнительные примечания:`,
+}
+
+const descriptionTemplateLabel = computed(() => ({
+  reels: 'Структура сценария Reels',
+  post: 'Структура публикации',
+  stories: 'Структура Stories',
+}[form.format] || 'Добавить структуру'))
+
+function insertDescriptionTemplate() {
+  const template = DESCRIPTION_TEMPLATES[form.format] || DESCRIPTION_TEMPLATES.post
+  form.description = form.description.trim()
+    ? `${form.description.trim()}\n\n——————————\n\n${template}`
+    : template
+}
 
 // --- AI-идеи ---
 const aiModal = ref(false)
@@ -40,12 +123,8 @@ const filtered = computed(() =>
 )
 
 async function load() {
-  const [c, u] = await Promise.all([
-    api.get(`/content/?brand=${props.brand.id}`),
-    api.get('/users/'),
-  ])
-  items.value = c.data
-  users.value = u.data
+  const { data } = await api.get(`/content/?brand=${props.brand.id}`)
+  items.value = data
 }
 onMounted(load)
 
@@ -147,8 +226,8 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
       </select>
       <div class="actions">
         <button class="btn soft sm" @click="downloadPdf(`/content/pdf/?brand=${brand.id}`, `ContentPlan_${brand.name}.pdf`)">↓ PDF</button>
-        <button class="btn outline sm" @click="brief = brand.description; ideas = []; aiModal = true">✦ AI-идеи</button>
-        <button class="btn sm" @click="openCreate">+ Запись</button>
+        <button v-if="canEdit" class="btn outline sm" @click="brief = brand.description; ideas = []; aiModal = true"><AppIcon name="sparkles" :size="16" /> AI-идеи</button>
+        <button v-if="canEdit" class="btn sm" @click="openCreate">+ Запись</button>
       </div>
     </div>
 
@@ -164,9 +243,9 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in filtered" :key="item.id" @click="openEdit(item)">
+          <tr v-for="item in filtered" :key="item.id" :class="{ editable: canEdit }" @click="canEdit && openEdit(item)">
             <td class="title-cell">
-              <span v-if="item.generated_by_ai" class="ai-dot" title="Идея от AI">✦</span>
+              <span v-if="item.generated_by_ai" class="ai-dot" title="Идея от AI"><AppIcon name="sparkles" :size="14" /></span>
               {{ item.title }}
             </td>
             <td>{{ CONTENT_FORMAT[item.format] }}</td>
@@ -182,7 +261,7 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
             <td>{{ fmtDate(item.publish_date, true) }}</td>
             <td @click.stop>
               <select
-                class="status-select" :value="item.status"
+                class="status-select" :value="item.status" :disabled="!canEdit"
                 :style="{ color: CONTENT_STATUS[item.status]?.color, background: CONTENT_STATUS[item.status]?.bg }"
                 @change="setStatus(item, $event.target.value)"
               >
@@ -202,7 +281,7 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
     </div>
 
     <!-- ===== запись ===== -->
-    <AppModal :open="itemModal" :title="editingId ? 'Редактировать запись' : 'Новая запись'" width="620px" @close="itemModal = false">
+    <AppModal :open="itemModal" :title="editingId ? 'Редактировать запись' : 'Новая запись'" width="820px" solid @close="itemModal = false">
       <div class="form">
         <div><label class="field">Название *</label><input v-model="form.title" class="input" /></div>
         <div class="row2">
@@ -220,17 +299,35 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
           </div>
         </div>
         <p class="mode-hint">Приоритет рассчитывается автоматически по ближайшему этапу и его точному времени.</p>
-        <div><label class="field">Описание</label><textarea v-model="form.description" class="textarea" rows="3" /></div>
+        <div class="script-field">
+          <div class="script-heading">
+            <div>
+              <label class="field">Сценарий и техническое задание</label>
+              <span>Опишите кадры, реплики, монтаж, реквизит и CTA — текст сохраняется полностью.</span>
+            </div>
+            <button type="button" class="btn soft sm" @click="insertDescriptionTemplate">
+              <AppIcon name="edit" :size="15" /> {{ descriptionTemplateLabel }}
+            </button>
+          </div>
+          <textarea
+            v-model="form.description" class="textarea script-textarea" rows="14"
+            placeholder="Например: Кадр 1 — крупный план продукта; действие; реплика; движение камеры…"
+          />
+          <div class="editor-meta">
+            <span>Можно вставлять ссылки и разбивать сценарий на любое количество кадров</span>
+            <span>{{ form.description.length.toLocaleString('ru-RU') }} символов</span>
+          </div>
+        </div>
         <div class="row3">
-          <div><label class="field">Съёмка</label><input :value="form.shooting_date" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @input="form.shooting_date = maskCompactDateTime($event.target.value)" /></div>
-          <div><label class="field">Монтаж</label><input :value="form.editing_deadline" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @input="form.editing_deadline = maskCompactDateTime($event.target.value)" /></div>
-          <div><label class="field">Публикация</label><input :value="form.publish_date" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @input="form.publish_date = maskCompactDateTime($event.target.value)" /></div>
+          <div><label class="field">Съёмка</label><input :value="form.shooting_date" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.shooting_date = maskCompactDateTime($event.target.value)" /></div>
+          <div><label class="field">Монтаж</label><input :value="form.editing_deadline" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.editing_deadline = maskCompactDateTime($event.target.value)" /></div>
+          <div><label class="field">Публикация</label><input :value="form.publish_date" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.publish_date = maskCompactDateTime($event.target.value)" /></div>
         </div>
         <div>
           <label class="field">Ответственный</label>
           <select v-model="form.assignee" class="select">
             <option :value="null">—</option>
-            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.full_name }}</option>
+            <option v-for="u in teamUsers" :key="u.id" :value="u.id">{{ u.full_name }}</option>
           </select>
         </div>
         <div><label class="field">Комментарии</label><textarea v-model="form.comments" class="textarea" rows="2" /></div>
@@ -244,7 +341,7 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
     </AppModal>
 
     <!-- ===== AI-идеи ===== -->
-    <AppModal :open="aiModal" title="✦ AI: идеи для контент-плана" width="640px" @close="aiModal = false">
+    <AppModal :open="aiModal" title="AI: идеи для контент-плана" width="640px" solid @close="aiModal = false">
       <template v-if="!ideas.length">
         <div class="ai-guide">
           <strong>Контент на узбекском языке латиницей</strong>
@@ -282,7 +379,7 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
           <button class="btn outline" @click="aiModal = false">Отмена</button>
           <button class="btn" :disabled="generating || !brief.trim()" @click="generateIdeas">
             <span v-if="generating" class="spinner" />
-            {{ generating ? 'AI разрабатывает идеи…' : '✦ Предложить идеи' }}
+            <AppIcon v-if="!generating" name="sparkles" :size="16" />{{ generating ? 'AI разрабатывает идеи…' : 'Предложить идеи' }}
           </button>
         </template>
         <template v-else>
@@ -313,10 +410,11 @@ th {
   white-space: nowrap;
 }
 td { padding: 11px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-tbody tr { cursor: pointer; transition: background-color var(--dur-fast) ease; }
+tbody tr { transition: background-color var(--dur-fast) ease; }
+tbody tr.editable { cursor: pointer; }
 tbody tr:last-child td { border-bottom: 0; }
 @media (hover: hover) and (pointer: fine) {
-  tbody tr:hover { background: var(--sunken); }
+  tbody tr.editable:hover { background: var(--sunken); }
 }
 .title-cell { font-weight: 600; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
 .ai-dot { color: var(--violet); margin-right: 3px; }
@@ -336,6 +434,7 @@ tbody tr:last-child td { border-bottom: 0; }
   appearance: none;
   outline: none;
 }
+.status-select:disabled { cursor: default; opacity: .82; }
 
 .form { display: flex; flex-direction: column; gap: 13px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -351,6 +450,21 @@ tbody tr:last-child td { border-bottom: 0; }
 }
 .mode-switch button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
 .mode-hint { font-size: 0.76rem; color: var(--muted); margin-top: 5px; }
+.script-field { padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--sunken); }
+.script-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 10px; }
+.script-heading > div { min-width: 0; }
+.script-heading .field { margin-bottom: 3px; }
+.script-heading span { display: block; color: var(--muted); font-size: 0.76rem; line-height: 1.4; }
+.script-heading .btn { flex: none; }
+.script-textarea {
+  min-height: 310px;
+  resize: vertical;
+  background: var(--surface);
+  line-height: 1.6;
+  font-family: inherit;
+  tab-size: 2;
+}
+.editor-meta { display: flex; justify-content: space-between; gap: 16px; margin-top: 7px; color: var(--muted); font-size: 0.7rem; }
 .auto-mark {
   display: inline-grid; place-items: center;
   width: 16px; height: 16px; margin-left: 5px;
@@ -416,6 +530,11 @@ tbody tr:last-child td { border-bottom: 0; }
   .actions { flex-wrap: wrap; }
   .actions .btn { flex: 1 1 auto; }
   .row2, .row3 { grid-template-columns: 1fr; }
+  .script-field { padding: 11px; }
+  .script-heading { flex-direction: column; }
+  .script-heading .btn { width: 100%; }
+  .script-textarea { min-height: 360px; }
+  .editor-meta { flex-direction: column; gap: 2px; }
   .prio-row { align-items: stretch; flex-direction: column; }
   .mode-switch { width: 100%; }
   .mode-switch button { flex: 1; min-height: 40px; }

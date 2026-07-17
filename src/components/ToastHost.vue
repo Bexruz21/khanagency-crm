@@ -1,20 +1,29 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { useToastStore } from '../stores/toasts'
+import AppIcon from './AppIcon.vue'
 
 const toasts = useToastStore()
 const router = useRouter()
 
 const KIND = {
-  info: { icon: 'ℹ️', bar: 'var(--accent)' },
-  warning: { icon: '⏰', bar: 'var(--amber)' },
-  danger: { icon: '🔴', bar: 'var(--red)' },
-  success: { icon: '✓', bar: 'var(--green)' },
+  info: { icon: 'info', bar: 'var(--accent)' },
+  warning: { icon: 'clock', bar: 'var(--amber)' },
+  danger: { icon: 'alert', bar: 'var(--red)' },
+  success: { icon: 'check', bar: 'var(--green)' },
 }
 
 function open(t) {
   toasts.remove(t.id)
   if (t.link) router.push(t.link)
+}
+
+function cleanText(value) {
+  return String(value || '')
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+    .replace(/\uFE0F/gu, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
 }
 </script>
 
@@ -28,9 +37,9 @@ function open(t) {
           :style="{ '--bar': KIND[t.kind]?.bar }"
           @click="open(t)"
         >
-          <span class="icon">{{ KIND[t.kind]?.icon }}</span>
-          <p>{{ t.text }}</p>
-          <button class="x" aria-label="Закрыть" @click.stop="toasts.remove(t.id)">✕</button>
+          <span class="icon"><AppIcon :name="KIND[t.kind]?.icon || 'info'" :size="18" /></span>
+          <p>{{ cleanText(t.text) }}</p>
+          <button class="x" aria-label="Закрыть" @click.stop="toasts.remove(t.id)"><AppIcon name="close" :size="16" /></button>
         </div>
       </TransitionGroup>
     </div>
