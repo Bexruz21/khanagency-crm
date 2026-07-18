@@ -37,20 +37,6 @@ export const BRAND_STATUS = {
   done: { label: 'Завершён', color: 'var(--accent)', bg: tint('var(--accent)') },
 }
 
-export const EXPENSE_CATEGORY = {
-  content: 'Производство контента',
-  shooting: 'Съёмка',
-  editing: 'Монтаж',
-  design: 'Дизайн',
-  advertising: 'Реклама',
-  bloggers: 'Блогеры',
-  studio: 'Аренда студии',
-  transport: 'Транспорт',
-  props: 'Реквизит',
-  contractors: 'Подрядчики',
-  other: 'Другое',
-}
-
 export const EXPENSE_STATUS = {
   submitted: { label: 'На согласовании', color: 'var(--amber)', bg: tint('var(--amber)') },
   approved: { label: 'Одобрен', color: 'var(--sky)', bg: tint('var(--sky)') },

@@ -94,7 +94,11 @@ label { text-align: left; }
 .login-btn { width: 100%; justify-content: center; margin-top: 18px; padding: 11px; }
 .hint { color: var(--muted); font-size: 0.78rem; margin-top: 14px; }
 
-.shake { animation: shake 320ms var(--ease-out); }
+.login-card.shake {
+  opacity: 1;
+  transform: none;
+  animation: shake 320ms var(--ease-out);
+}
 @keyframes shake {
   20% { transform: translateX(-7px); }
   45% { transform: translateX(6px); }

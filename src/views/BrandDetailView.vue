@@ -46,6 +46,7 @@ const form = reactive({})
 const researchModal = ref(false)
 const researching = ref(false)
 const confirmingResearch = ref(false)
+const syncingInstagram = ref(false)
 const researchError = ref('')
 const searchHint = ref('')
 const researchDraft = ref(null)
@@ -76,8 +77,27 @@ function openEdit() {
     start_date: brand.value.start_date,
     duration_months: brand.value.duration_months || '',
     status: brand.value.status,
+    instagram_url: brand.value.instagram_url || '',
+    instagram_monitoring_enabled: !!brand.value.instagram_monitoring_enabled,
   })
   editModal.value = true
+}
+
+async function syncInstagram() {
+  syncingInstagram.value = true
+  try {
+    const { data } = await api.post(`/brands/${brand.value.id}/instagram-sync/`)
+    brand.value = data
+    toasts.push('Instagram-профиль и статистика обновлены.', 'success')
+  } catch (error) {
+    toasts.push(error.response?.data?.detail || 'Не удалось обновить Instagram.', 'danger')
+  } finally {
+    syncingInstagram.value = false
+  }
+}
+
+function fmtNumber(value) {
+  return Number(value || 0).toLocaleString('ru-RU')
 }
 
 async function saveEdit() {
@@ -191,7 +211,7 @@ async function confirmResearch() {
 
     <Transition name="page" mode="out-in" :duration="{ enter: 260, leave: 140 }">
       <div v-if="tab === 'overview'" key="overview" class="overview">
-        <div class="card panel">
+        <div class="card panel brand-panel">
           <div class="panel-heading">
             <div>
               <h2>О бренде</h2>
@@ -279,7 +299,8 @@ async function confirmResearch() {
           </div>
         </div>
 
-        <div class="card panel">
+        <div class="overview-side">
+        <div class="card panel team-panel">
           <h2>Команда</h2>
           <div v-if="brand.manager_detail" class="member">
             <UserAvatar :user="brand.manager_detail" :size="34" />
@@ -290,6 +311,26 @@ async function confirmResearch() {
             <div><strong>{{ m.full_name }}</strong><span class="muted">{{ m.position }}</span></div>
           </div>
           <button v-if="canEditBrand" class="btn ghost sm" style="margin-top: 8px" @click="openEdit">+ Изменить состав</button>
+        </div>
+
+        <div class="card panel instagram-panel">
+          <div class="panel-heading">
+            <div><h2>Instagram</h2><span class="muted">Профиль и мониторинг публикаций</span></div>
+            <a v-if="brand.instagram_url" :href="brand.instagram_url" target="_blank" rel="noopener" class="instagram-link"><AppIcon name="instagram" :size="17" /> Открыть</a>
+          </div>
+          <div v-if="brand.instagram_url" class="instagram-profile">
+            <span class="instagram-avatar"><AppIcon name="instagram" :size="25" /></span>
+            <div class="instagram-name"><strong>@{{ brand.instagram_username || brand.instagram_url.split('/').filter(Boolean).pop() }}</strong><span>{{ brand.instagram_monitoring_enabled ? 'Мониторинг включён' : 'Мониторинг выключен' }}</span></div>
+          </div>
+          <div v-if="brand.instagram_url" class="instagram-stats">
+            <div><strong>{{ fmtNumber(brand.instagram_followers) }}</strong><span>Подписчиков</span></div>
+            <div><strong>{{ fmtNumber(brand.instagram_media_count) }}</strong><span>Публикаций</span></div>
+          </div>
+          <p v-if="brand.instagram_sync_error" class="instagram-error">{{ brand.instagram_sync_error }}</p>
+          <p v-if="brand.instagram_last_synced_at" class="instagram-updated">Обновлено {{ fmtDate(brand.instagram_last_synced_at, true) }}</p>
+          <button v-if="canEditBrand && brand.instagram_monitoring_enabled" class="btn outline sm instagram-sync" :disabled="syncingInstagram" @click="syncInstagram"><AppIcon name="review" :size="16" /> {{ syncingInstagram ? 'Обновляем…' : 'Обновить показатели' }}</button>
+          <div v-if="!brand.instagram_url" class="instagram-empty"><AppIcon name="instagram" :size="24" /><span>Instagram-страница не добавлена</span><button v-if="canEditBrand" class="btn soft sm" @click="openEdit">Добавить</button></div>
+        </div>
         </div>
       </div>
 
@@ -324,6 +365,11 @@ async function confirmResearch() {
           <div><label class="field">Email</label><input v-model="form.contact_email" type="email" class="input" /></div>
           <div><label class="field">Дата начала</label><input v-model="form.start_date" type="date" class="input" /></div>
         </div>
+        <section class="instagram-settings">
+          <div class="settings-title"><AppIcon name="instagram" :size="19" /><div><strong>Instagram</strong><span>Автоматический мониторинг публичного профиля через Apify каждые 6 часов</span></div></div>
+          <div><label class="field">Ссылка на страницу</label><input v-model="form.instagram_url" type="url" class="input" placeholder="https://instagram.com/brand" /></div>
+          <label class="monitor-switch"><input v-model="form.instagram_monitoring_enabled" type="checkbox" /><span>Автоматически мониторить профиль и опубликованный контент</span></label>
+        </section>
         <div><label class="field">Срок проекта, месяцев</label><input :value="form.duration_months" class="input" inputmode="numeric" maxlength="3" placeholder="Например 6" @keydown="allowPositiveIntegerKey" @input="$event.target.value = form.duration_months = positiveInteger($event.target.value)" /></div>
           <div v-if="auth.user?.role === 'admin'">
             <label class="field">Project Manager</label>
@@ -553,6 +599,28 @@ async function confirmResearch() {
 .member { display: flex; align-items: center; gap: 11px; padding: 7px 0; }
 .member strong { display: block; font-size: 0.92rem; }
 .member .muted { font-size: 0.8rem; }
+.overview-side { display: flex; min-width: 0; flex-direction: column; gap: 14px; }
+.team-panel,.instagram-panel { width: 100%; }
+.instagram-link { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: .8rem; font-weight: 700; text-decoration: none; }
+.instagram-profile { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
+.instagram-avatar { display: grid; width: 44px; height: 44px; flex: none; place-items: center; overflow: hidden; border-radius: 14px; background: linear-gradient(135deg, var(--violet-soft), var(--red-soft)); color: var(--violet); }
+.instagram-name strong,.instagram-name span { display: block; }
+.instagram-name span { margin-top: 2px; color: var(--muted); font-size: .74rem; }
+.instagram-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.instagram-stats>div { padding: 10px 12px; border-radius: 11px; background: var(--sunken); }
+.instagram-stats strong,.instagram-stats span { display: block; }
+.instagram-stats strong { font-size: 1.05rem; }
+.instagram-stats span { margin-top: 2px; color: var(--muted); font-size: .7rem; }
+.instagram-updated { margin-top: 9px; color: var(--muted); font-size: .7rem; }
+.instagram-error { margin-top: 9px; color: var(--red); font-size: .76rem; line-height: 1.4; }
+.instagram-sync { width: 100%; margin-top: 12px; }
+.instagram-empty { display: flex; min-height: 120px; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: var(--muted); font-size: .8rem; text-align: center; }
+.instagram-settings { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--sunken); }
+.settings-title { display: flex; align-items: flex-start; gap: 9px; }
+.settings-title strong,.settings-title span { display: block; }
+.settings-title span { margin-top: 2px; color: var(--muted); font-size: .72rem; line-height: 1.4; }
+.monitor-switch { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: .82rem; cursor: pointer; }
+.monitor-switch input { width: 17px; height: 17px; accent-color: var(--accent); }
 
 .form { display: flex; flex-direction: column; gap: 13px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -600,7 +668,7 @@ async function confirmResearch() {
   .source-list a:hover { transform: translateY(-1px); background: var(--accent-soft); }
 }
 
-@media (max-width: 900px) { .overview { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .overview { grid-template-columns: 1fr; } .overview-side { gap: 10px; } }
 @media (max-width: 640px) {
   .head { align-items: stretch; flex-direction: column; gap: 12px; }
   .head-actions { justify-content: space-between; }

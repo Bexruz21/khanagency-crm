@@ -6,7 +6,7 @@ import { useToastStore } from '../../stores/toasts'
 import AppIcon from '../AppIcon.vue'
 import AppModal from '../AppModal.vue'
 import StatusBadge from '../StatusBadge.vue'
-import { EXPENSE_CATEGORY, EXPENSE_STATUS, allowSumKey, fmtDate, formatSum, maskSum, parseSum } from '../../labels'
+import { EXPENSE_STATUS, allowSumKey, fmtDate, formatSum, maskSum, parseSum } from '../../labels'
 
 const props = defineProps({ brand: { type: Object, required: true } })
 const auth = useAuthStore()
@@ -22,14 +22,14 @@ const formType = ref('expense')
 const saving = ref(false)
 const reportLoading = ref(false)
 const error = ref('')
-const filters = reactive({ date_from: '', date_to: '', category: '', status: '', created_by: '' })
+const filters = reactive({ date_from: '', date_to: '', status: '', created_by: '' })
 const filtersOpen = ref(false)
 
 const today = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
-const form = reactive({ category: 'other', purpose: '', amount: '', date: today(), content_item: '' })
+const form = reactive({ purpose: '', amount: '', date: today(), content_item: '' })
 const cards = computed(() => [
   { label: 'Сумма договора', value: summary.value?.budget, tone: 'accent' },
   { label: 'Получено от бренда', value: summary.value?.income, tone: 'green' },
@@ -44,7 +44,7 @@ const canManageExpenses = computed(() => auth.user?.role === 'admin' || isAssign
 const canDeleteExpenses = computed(() => auth.user?.role === 'admin')
 const activeFilterCount = computed(() => {
   const keys = view.value === 'expenses'
-    ? ['date_from', 'date_to', 'category', 'status', 'created_by']
+    ? ['date_from', 'date_to', 'status', 'created_by']
     : ['date_from', 'date_to']
   return keys.filter((key) => filters[key]).length
 })
@@ -56,8 +56,8 @@ function params(extra = {}) {
 async function load() {
   const [expenseResponse, incomeResponse, summaryResponse, contentResponse] = await Promise.all([
     api.get('/expenses/', { params: params() }),
-    api.get('/incomes/', { params: params({ category: '', status: '', created_by: '' }) }),
-    api.get('/expenses/summary/', { params: params({ category: '', status: '', created_by: '' }) }),
+    api.get('/incomes/', { params: params({ status: '', created_by: '' }) }),
+    api.get('/expenses/summary/', { params: params({ status: '', created_by: '' }) }),
     api.get('/content/', { params: { brand: props.brand.id } }),
   ])
   expenses.value = expenseResponse.data
@@ -77,14 +77,14 @@ async function loadExpenseAuthors() {
 onMounted(() => Promise.all([load(), loadExpenseAuthors()]))
 
 function resetFilters() {
-  Object.assign(filters, { date_from: '', date_to: '', category: '', status: '', created_by: '' })
+  Object.assign(filters, { date_from: '', date_to: '', status: '', created_by: '' })
   filtersOpen.value = false
   load()
 }
 
 function openCreate(type) {
   formType.value = type
-  Object.assign(form, { category: 'other', purpose: '', amount: '', date: today(), content_item: '' })
+  Object.assign(form, { purpose: '', amount: '', date: today(), content_item: '' })
   error.value = ''
   modal.value = true
 }
@@ -105,7 +105,7 @@ async function save() {
       toasts.push('Доход добавлен в учёт проекта.', 'success')
     } else {
       await api.post('/expenses/', {
-        brand: props.brand.id, content_item: form.content_item || null, category: form.category,
+        brand: props.brand.id, content_item: form.content_item || null,
         purpose: form.purpose.trim(), amount, expense_date: form.date,
       })
       toasts.push('Расход отправлен на согласование.', 'success')
@@ -174,20 +174,19 @@ async function downloadReport() {
       <div v-if="filtersOpen" class="compact-filters">
         <label class="filter-field"><span>Дата от</span><input v-model="filters.date_from" type="date" class="input" /></label>
         <label class="filter-field"><span>Дата до</span><input v-model="filters.date_to" type="date" class="input" /></label>
-        <label v-if="view === 'expenses'" class="filter-field"><span>Категория</span><select v-model="filters.category" class="select"><option value="">Все категории</option><option v-for="(label, key) in EXPENSE_CATEGORY" :key="key" :value="key">{{ label }}</option></select></label>
         <label v-if="view === 'expenses'" class="filter-field"><span>Статус</span><select v-model="filters.status" class="select"><option value="">Все статусы</option><option v-for="(item, key) in EXPENSE_STATUS" :key="key" :value="key">{{ item.label }}</option></select></label>
         <label v-if="view === 'expenses'" class="filter-field"><span>Добавил</span><select v-model="filters.created_by" class="select"><option value="">Все авторы</option><option v-for="author in expenseAuthors" :key="author.id" :value="author.id">{{ author.name }}</option></select></label>
         <div class="filter-actions"><button class="btn sm" @click="load">Применить</button><button class="btn outline sm" @click="resetFilters">Сбросить</button></div>
       </div>
       <div class="table-wrap">
         <table v-if="view === 'expenses'">
-        <thead><tr><th>Дата</th><th>Категория</th><th>Для чего</th><th>Контент</th><th>Добавил</th><th>Сумма</th><th>Статус</th><th v-if="canManageExpenses">Действия</th></tr></thead>
+        <thead><tr><th>Дата</th><th>Для чего</th><th>Контент</th><th>Добавил</th><th>Сумма</th><th>Статус</th><th v-if="canManageExpenses">Действия</th></tr></thead>
         <tbody>
           <tr v-for="expense in expenses" :key="expense.id">
-            <td>{{ fmtDate(expense.expense_date) }}</td><td>{{ EXPENSE_CATEGORY[expense.category] }}</td><td class="purpose" :title="expense.purpose">{{ expense.purpose }}</td><td>{{ expense.content_title || 'Общий расход' }}</td><td>{{ expense.created_by_detail?.full_name || '—' }}</td><td class="amount negative">−{{ formatSum(expense.amount) }}</td><td><StatusBadge :map="EXPENSE_STATUS" :value="expense.status" /></td>
+            <td>{{ fmtDate(expense.expense_date) }}</td><td class="purpose" :title="expense.purpose">{{ expense.purpose }}</td><td>{{ expense.content_title || 'Общий расход' }}</td><td>{{ expense.created_by_detail?.full_name || '—' }}</td><td class="amount negative">−{{ formatSum(expense.amount) }}</td><td><StatusBadge :map="EXPENSE_STATUS" :value="expense.status" /></td>
             <td v-if="canManageExpenses" class="actions"><div class="action-buttons"><button v-if="expense.status === 'submitted'" class="mini approve" title="Одобрить" @click="setStatus(expense, 'approved')"><AppIcon name="check" :size="16" /></button><button v-if="expense.status === 'submitted'" class="mini reject" title="Отклонить" @click="setStatus(expense, 'rejected')"><AppIcon name="close" :size="16" /></button><button v-if="canDeleteExpenses" class="mini" title="Удалить" @click="removeRecord('expenses', expense)"><AppIcon name="close" :size="16" /></button></div></td>
           </tr>
-          <tr v-if="!expenses.length"><td :colspan="canManageExpenses ? 8 : 7" class="empty">Расходов по выбранным фильтрам нет</td></tr>
+          <tr v-if="!expenses.length"><td :colspan="canManageExpenses ? 7 : 6" class="empty">Расходов по выбранным фильтрам нет</td></tr>
         </tbody>
       </table>
         <table v-else>
@@ -199,7 +198,7 @@ async function downloadReport() {
 
     <AppModal :open="modal" :title="formType === 'income' ? 'Новый доход' : 'Новый расход'" width="560px" @close="modal = false">
       <div class="form">
-        <div class="row2"><div v-if="formType === 'expense'"><label class="field">Категория</label><select v-model="form.category" class="select"><option v-for="(label, key) in EXPENSE_CATEGORY" :key="key" :value="key">{{ label }}</option></select></div><div><label class="field">Дата</label><input v-model="form.date" type="date" class="input" /></div></div>
+        <div><label class="field">Дата</label><input v-model="form.date" type="date" class="input" /></div>
         <div v-if="formType === 'expense'"><label class="field">Запись контент-плана</label><select v-model="form.content_item" class="select"><option value="">Общий расход проекта</option><option v-for="item in contentItems" :key="item.id" :value="item.id">{{ item.title }}</option></select></div>
         <div><label class="field">{{ formType === 'income' ? 'За что поступила оплата' : 'Для чего потрачено *' }}</label><textarea v-model="form.purpose" class="textarea" rows="4" :placeholder="formType === 'income' ? 'Например: оплата за июль, первый транш 30%' : 'Например: аренда студии для трёх Reels'" /></div>
         <div><label class="field">Сумма *</label><div class="sum-field"><input :value="form.amount" inputmode="numeric" class="input amount-input" placeholder="00.000.000" @keydown="allowSumKey" @input="updateAmount" /><span>сум</span></div></div>
@@ -234,7 +233,7 @@ async function downloadReport() {
 .filter-toggle { min-width: 104px; justify-content: center; }
 .filter-toggle.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .filter-count { display: grid; min-width: 18px; height: 18px; place-items: center; margin-left: 2px; border-radius: 99px; background: var(--accent); color: white; font-size: .65rem; font-weight: 750; }
-.compact-filters { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)) auto; align-items: center; gap: 9px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--sunken); }
+.compact-filters { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)) auto; align-items: center; gap: 9px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--sunken); }
 .filter-field { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
 .filter-field > span { color: var(--muted); font-size: .68rem; font-weight: 650; }
 .filter-field .input, .filter-field .select { width: 100%; min-width: 0; }

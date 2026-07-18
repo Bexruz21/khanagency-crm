@@ -10,6 +10,8 @@ import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const users = ref(null)
+const workload = ref(null)
+const viewMode = ref('team')
 const isAdmin = computed(() => auth.user?.role === 'admin')
 const visibleUsers = computed(() => {
   if (!users.value) return []
@@ -42,6 +44,13 @@ function effClass(v) {
   return v >= 80 ? 'green' : v >= 50 ? 'amber' : 'red'
 }
 
+const workloadLabels = {
+  available: 'Свободен', balanced: 'Оптимально', high: 'Высокая', overloaded: 'Перегружен',
+}
+function workloadTone(level) {
+  return { available: 'green', balanced: 'blue', high: 'amber', overloaded: 'red' }[level]
+}
+
 const COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#ef4444', '#8b5cf6', '#14b8a6']
 const blank = {
   username: '', password: '', first_name: '', last_name: '', email: '',
@@ -51,8 +60,11 @@ const blank = {
 const form = reactive({ ...blank })
 
 async function load() {
-  const { data } = await api.get('/users/')
-  users.value = data
+  const [usersResponse, workloadResponse] = await Promise.all([
+    api.get('/users/'), api.get('/users/workload/'),
+  ])
+  users.value = usersResponse.data
+  workload.value = workloadResponse.data
 }
 onMounted(load)
 
@@ -77,15 +89,15 @@ async function save() {
 <template>
   <div>
     <div class="head">
-      <h1 class="page-title" style="margin: 0">Команда</h1>
-      <button v-if="isAdmin" class="btn" @click="modal = true">+ Сотрудник</button>
+      <div><h1 class="page-title" style="margin: 0">Команда</h1><p>Статистика и текущая загрузка сотрудников</p></div>
+      <div class="head-actions"><div class="team-switch"><button :class="{ on: viewMode === 'team' }" @click="viewMode = 'team'">Команда</button><button :class="{ on: viewMode === 'workload' }" @click="viewMode = 'workload'">Загрузка</button></div><button v-if="isAdmin" class="btn" @click="modal = true">+ Сотрудник</button></div>
     </div>
 
-    <div v-if="!users" class="cards">
+    <div v-if="!users || !workload" class="cards">
       <div v-for="i in 4" :key="i" class="skeleton" style="height: 150px" />
     </div>
 
-    <div v-else class="cards">
+    <div v-else-if="viewMode === 'team'" class="cards">
       <div v-for="u in visibleUsers" :key="u.id" class="card person rise" @click="openStats(u)">
         <UserAvatar :user="u" :size="46" />
         <div class="info">
@@ -103,6 +115,17 @@ async function save() {
           <span class="more">Статистика →</span>
         </div>
       </div>
+    </div>
+
+    <div v-else class="workload-page">
+      <div class="workload-legend"><span><i class="green" /> Свободен</span><span><i class="blue" /> Оптимально</span><span><i class="amber" /> Высокая загрузка</span><span><i class="red" /> Перегружен</span></div>
+      <article v-for="row in workload" :key="row.user.id" class="card workload-row" @click="openStats(row.user)">
+        <div class="work-person"><UserAvatar :user="row.user" :size="48" /><div><strong>{{ row.user.full_name }}</strong><span>{{ row.user.position || 'Сотрудник' }}</span></div></div>
+        <div class="load-meter"><div><span>Загрузка</span><strong :class="workloadTone(row.level)">{{ row.score }}%</strong></div><div class="meter"><i :class="workloadTone(row.level)" :style="{ width: `${row.score}%` }" /></div><small :class="workloadTone(row.level)">{{ workloadLabels[row.level] }}</small></div>
+        <div class="work-counters"><span><strong>{{ row.active_tasks }}</strong> задач</span><span><strong>{{ row.active_content }}</strong> контентов</span><span :class="{ danger: row.overdue_tasks + row.overdue_content }"><strong>{{ row.overdue_tasks + row.overdue_content }}</strong> просрочено</span><span><strong>{{ row.week_tasks + row.week_content }}</strong> на 7 дней</span></div>
+        <div class="next-work"><strong>Ближайшее</strong><div v-for="deadline in row.next_deadlines.slice(0, 2)" :key="`${deadline.type}-${deadline.title}-${deadline.date}`"><AppIcon :name="deadline.type === 'task' ? 'check' : 'movie'" :size="14" /><span>{{ deadline.title }}</span><time>{{ fmtDate(deadline.date, true) }}</time></div><span v-if="!row.next_deadlines.length" class="no-deadline">Нет ближайших дедлайнов</span></div>
+      </article>
+      <div v-if="!workload.length" class="card empty-workload">Нет сотрудников в доступных вам проектах</div>
     </div>
 
     <!-- ===== статистика сотрудника ===== -->
@@ -202,7 +225,12 @@ async function save() {
 </template>
 
 <style scoped>
-.head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.head { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 20px; }
+.head p { margin-top: 4px; color: var(--muted); font-size: .8rem; }
+.head-actions { display: flex; align-items: center; gap: 10px; }
+.team-switch { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--sunken); }
+.team-switch button { min-height: 34px; padding: 6px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.team-switch button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
 
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
 .person { padding: 18px 20px; display: grid; grid-template-columns: auto 1fr auto; gap: 4px 14px; align-items: center; }
@@ -228,6 +256,23 @@ async function save() {
 .coins, .coin-value { display: inline-flex; align-items: center; gap: 6px; }
 .coins.neg { color: var(--red); }
 .more { margin-left: auto; color: var(--accent); font-weight: 600; }
+.workload-page { display: flex; flex-direction: column; gap: 10px; }
+.workload-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: .72rem; }
+.workload-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.workload-legend i { width: 8px; height: 8px; border-radius: 50%; }
+.workload-row { display: grid; grid-template-columns: minmax(190px,.9fr) minmax(180px,.8fr) minmax(250px,1fr) minmax(250px,1.1fr); align-items: center; gap: 18px; padding: 15px 17px; cursor: pointer; }
+.work-person { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.work-person>div { min-width: 0; }
+.work-person>div strong,.work-person>div span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-person>div span { margin-top: 3px; color: var(--muted); font-size: .72rem; }
+.work-person :deep(.avatar) { display: inline-flex; flex: 0 0 48px; border: 3px solid var(--surface-solid); box-shadow: 0 0 0 1px var(--line), 0 4px 12px rgb(0 0 0 / .08); }
+.load-meter>div:first-child { display: flex; justify-content: space-between; color: var(--muted); font-size: .72rem; }
+.load-meter strong { font-size: .82rem; }.load-meter small { display: block; margin-top: 4px; font-size: .66rem; font-weight: 700; }
+.meter { height: 7px; margin-top: 6px; overflow: hidden; border-radius: 99px; background: var(--sunken); }.meter i { display: block; height: 100%; border-radius: inherit; transition: width 400ms var(--ease-out); }
+.green { color: var(--green)!important; }.blue { color: var(--sky)!important; }.amber { color: var(--amber)!important; }.red { color: var(--red)!important; }
+.meter .green,.workload-legend .green { background: var(--green); }.meter .blue,.workload-legend .blue { background: var(--sky); }.meter .amber,.workload-legend .amber { background: var(--amber); }.meter .red,.workload-legend .red { background: var(--red); }
+.work-counters { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; }.work-counters span { color: var(--muted); font-size: .7rem; }.work-counters strong { color: var(--ink); font-size: .82rem; }.work-counters .danger,.work-counters .danger strong { color: var(--red); }
+.next-work { min-width: 0; }.next-work>strong { display: block; margin-bottom: 5px; color: var(--muted); font-size: .68rem; text-transform: uppercase; }.next-work>div { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 6px; padding: 2px 0; font-size: .7rem; }.next-work>div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.next-work time { color: var(--muted); white-space: nowrap; }.no-deadline { color: var(--green); font-size: .72rem; }.empty-workload { padding: 30px; color: var(--muted); text-align: center; }
 
 /* ---- модалка статистики ---- */
 .coin-hero {
@@ -299,6 +344,7 @@ async function save() {
 
 @media (max-width: 640px) {
   .head { align-items: stretch; flex-direction: column; gap: 12px; }
+  .head-actions { align-items: stretch; flex-direction: column; }.team-switch { width: 100%; }.team-switch button { flex: 1; }
   .head .btn { width: 100%; }
   .cards { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .person { padding: 16px; gap: 4px 10px; }
@@ -311,5 +357,8 @@ async function save() {
   .tx-amount { width: auto; }
   .row2 { grid-template-columns: 1fr; }
   .color { width: 32px; height: 32px; }
+  .workload-row { grid-template-columns: 1fr; gap: 13px; padding: 15px; }.work-counters { padding: 10px; border-radius: 10px; background: var(--sunken); }
+  .work-person :deep(.avatar) { flex-basis: 46px; width: 46px!important; height: 46px!important; }
 }
+@media (min-width: 641px) and (max-width: 1100px) { .workload-row { grid-template-columns: 1fr 1fr; }.next-work { grid-column: 1/-1; } }
 </style>
