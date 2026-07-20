@@ -25,6 +25,7 @@ const paths = {
   filter: 'M3 5h18v2H3V5Zm3 6h12v2H6v-2Zm4 6h4v2h-4v-2Z',
   archive: 'M4 3h16l2 4v2h-1v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9H2V7l2-4Zm1.4 2-1 2h15.2l-1-2H5.4ZM5 9v11h14V9H5Zm4 3h6v2H9v-2Z',
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-4.4 0-8 2-8 4.5V21h16v-2.5C20 16 16.4 14 12 14Z',
+  logout: 'M17 7l-1.4 1.4L18.2 11H8v2h10.2l-2.6 2.6L17 17l5-5-5-5ZM4 5h8V3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8v-2H4V5Z',
   'chevron-down': 'm7.4 8.6 4.6 4.6 4.6-4.6L18 10l-6 6-6-6 1.4-1.4Z',
 }
 </script>

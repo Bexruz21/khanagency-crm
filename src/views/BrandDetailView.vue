@@ -622,8 +622,10 @@ async function confirmResearch() {
 .monitor-switch { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: .82rem; cursor: pointer; }
 .monitor-switch input { width: 17px; height: 17px; accent-color: var(--accent); }
 
-.form { display: flex; flex-direction: column; gap: 13px; }
+.form { display: flex; min-width: 0; max-width: 100%; flex-direction: column; gap: 13px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.row2 > div { min-width: 0; max-width: 100%; }
+.row2 input[type="date"] { inline-size: 100%; min-inline-size: 0; max-inline-size: 100%; }
 .chips { display: flex; flex-wrap: wrap; gap: 7px; }
 .chip {
   border: 1px solid var(--line);
@@ -688,6 +690,7 @@ async function confirmResearch() {
   .info-grid { gap: 4px; }
   .info-item { padding-inline: 4px; }
   .row2 { grid-template-columns: 1fr; }
+  .row2 input[type="date"] { width: 100%; min-width: 0; max-width: 100%; }
   .review-banner { align-items: flex-start; flex-direction: column; }
   .source-list { grid-template-columns: 1fr; }
   .research-section { padding: 13px; }

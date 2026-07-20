@@ -174,8 +174,10 @@ h3 { font-size: 1.08rem; }
 .avatars > * { margin-right: -7px; border: 2px solid var(--surface); }
 .pm { font-size: 0.79rem; color: var(--muted); }
 
-.form { display: flex; flex-direction: column; gap: 13px; }
+.form { display: flex; min-width: 0; max-width: 100%; flex-direction: column; gap: 13px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.row2 > div { min-width: 0; max-width: 100%; }
+.row2 input[type="date"] { inline-size: 100%; min-inline-size: 0; max-inline-size: 100%; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 7px; }
 .chip {
@@ -199,6 +201,7 @@ h3 { font-size: 1.08rem; }
   .meta { flex-wrap: wrap; gap: 6px 12px; }
   .budget { width: 100%; margin-left: 0; }
   .row2 { grid-template-columns: 1fr; }
+  .row2 input[type="date"] { width: 100%; min-width: 0; max-width: 100%; }
   .chip { min-height: 38px; }
 }
 </style>

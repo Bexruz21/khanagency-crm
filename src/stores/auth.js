@@ -29,7 +29,7 @@ export const useAuthStore = defineStore('auth', {
       } catch (e) {
         this.error = e.response?.status === 401
           ? 'Неверный логин или пароль'
-          : 'Сервер недоступен. Запущен ли backend?'
+          : 'Сервер недоступен.'
         return false
       } finally {
         this.loading = false

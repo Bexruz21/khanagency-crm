@@ -139,6 +139,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .input, .select, .textarea {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   border: 0.5px solid var(--line-strong);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--surface-solid) 86%, transparent);
@@ -265,4 +267,12 @@ label.field { display: block; font-size: 0.8rem; font-weight: 590; letter-spacin
   .page-title { font-size: 1.55rem; margin-bottom: 16px; }
   .card { border-radius: var(--radius); }
   .input, .select, .textarea { min-height: 44px; font-size: 16px; }
+  input[type="date"], input[type="datetime-local"], input[type="time"] {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+  }
 }

@@ -194,7 +194,7 @@ onMounted(load)
   padding: 14px;
   margin-bottom: 14px;
 }
-.filters > div { min-width: 0; }
+.filters > div { width: 100%; min-width: 0; max-width: 100%; }
 .filters .input, .filters .select { display: block; width: 100%; max-width: 100%; min-width: 0; }
 .filters.employee { grid-template-columns: repeat(3, minmax(145px, 1fr)) auto; }
 .reset { white-space: nowrap; }
@@ -256,6 +256,7 @@ section h4 { margin: 0 0 9px; font-size: 0.9rem; }
 @media (max-width: 640px) {
   .filters, .filters.employee { width: 100%; max-width: 100%; grid-template-columns: minmax(0, 1fr); overflow: hidden; }
   .filters > div, .filters .input, .filters .select { width: 100%; max-width: 100%; min-width: 0; }
+  .filters input[type="date"] { inline-size: 100%; min-inline-size: 0; max-inline-size: 100%; }
   .reset { width: 100%; }
   th, td { padding-inline: 11px; }
   .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

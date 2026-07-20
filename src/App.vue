@@ -348,21 +348,8 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
   .nav-item .label, .collapsed .nav-item .label { display: none; }
   .sidebar-user,
   .collapsed .sidebar-user {
-    flex: 0 0 auto;
-    justify-content: center;
-    padding: 0 0 0 3px;
-    border: 0;
+    display: none;
   }
-  .user-link { display: none; }
-  .logout,
-  .collapsed .logout {
-    display: grid;
-    width: 46px;
-    height: 52px;
-    flex-basis: 46px;
-    border-radius: 14px;
-  }
-  .logout svg { width: 21px; height: 21px; }
 }
 
 @media (prefers-reduced-transparency: reduce) {

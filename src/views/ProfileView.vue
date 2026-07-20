@@ -117,15 +117,15 @@ async function save() {
       <div>
         <label class="field">Telegram chat_id — для личных уведомлений о задачах</label>
         <div class="tg-row">
-          <input v-model="form.telegram_chat_id" class="input" placeholder="число от @userinfobot, напр. 512345678" />
+          <input v-model="form.telegram_chat_id" class="input" placeholder="число от @getidsbot, напр. 512345678" />
           <button type="button" class="btn outline" :disabled="tgChecking" @click="testTelegram">
             {{ tgChecking ? 'Проверяем…' : 'Проверить' }}
           </button>
         </div>
         <p v-if="tgResult" class="tg-note" :class="tgResult.ok ? 'ok' : 'err'">{{ tgResult.message }}</p>
         <p class="tg-hint">
-          Как получить id: откройте бота <b>@khan_notification_bot</b>, нажмите <b>Start</b>,
-          затем напишите боту <b>@userinfobot</b> — он пришлёт ваш числовой id. Вставьте его сюда и нажмите «Проверить».
+          Как получить id: откройте бота <b><a href="https://t.me/khan_notification_bot">@khan_notification_bot</a></b>, нажмите <b>Start</b>,
+          затем напишите боту <b><a href="https://t.me/getidsbot">@getidsbot</a></b> — он пришлёт ваш числовой id. Вставьте его сюда и нажмите «Проверить».
         </p>
       </div>
       <div>
@@ -140,6 +140,14 @@ async function save() {
             class="color" :class="{ on: form.avatar_color === c }"
             :style="{ background: c }" @click="form.avatar_color = c"
           />
+          <label
+            class="color custom-color"
+            :class="{ on: !COLORS.includes(form.avatar_color) }"
+            title="Выбрать любой цвет"
+          >
+            <input v-model="form.avatar_color" type="color" aria-label="Выбрать любой цвет аватара" />
+            <span :style="{ background: form.avatar_color }" />
+          </label>
         </div>
       </div>
 
@@ -151,6 +159,17 @@ async function save() {
         <button class="btn" :disabled="saving">{{ saving ? 'Сохраняем…' : 'Сохранить' }}</button>
       </div>
     </form>
+
+    <section class="card mobile-session-card rise">
+      <div>
+        <strong>Сеанс</strong>
+        <span>Завершить текущий сеанс на этом устройстве</span>
+      </div>
+      <button type="button" class="btn danger mobile-logout" @click="auth.logout()">
+        <AppIcon name="logout" :size="18" />
+        Выйти из аккаунта
+      </button>
+    </section>
   </div>
 </template>
 
@@ -209,7 +228,7 @@ async function save() {
 .form { padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-.colors { display: flex; gap: 8px; }
+.colors { display: flex; align-items: center; gap: 8px; }
 .color {
   width: 26px; height: 26px;
   border-radius: 50%;
@@ -219,11 +238,63 @@ async function save() {
 }
 .color:active { transform: scale(0.9); }
 .color.on { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+.custom-color {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: conic-gradient(#ef4444, #f59e0b, #10b981, #0ea5e9, #8b5cf6, #ec4899, #ef4444);
+}
+.custom-color::before {
+  position: absolute;
+  inset: 3px;
+  border-radius: inherit;
+  background: var(--surface-solid);
+  content: '';
+}
+.custom-color input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.custom-color span {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  pointer-events: none;
+}
 
 .error { color: var(--red); font-size: 0.85rem; }
 .foot { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
 .saved { color: var(--green); font-weight: 600; font-size: 0.9rem; }
-
+.mobile-session-card { display: none; }
+.tg-hint a {
+  text-decoration: none;
+  color: var(--accent-ink)
+}
+@media (max-width: 760px) {
+  .mobile-session-card {
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 14px;
+    padding: 18px;
+  }
+  .mobile-session-card strong,
+  .mobile-session-card span { display: block; }
+  .mobile-session-card span {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+  .mobile-logout { width: 100%; }
+}
 @media (max-width: 640px) {
   .head { padding: 18px; gap: 14px; }
   .theme-card { padding: 16px 18px; align-items: stretch; flex-direction: column; }
