@@ -29,6 +29,37 @@ const blank = {
 }
 const form = reactive({ ...blank })
 const metricForm = reactive({ views: 0, likes: 0, comments: 0 })
+const scriptMode = ref('manual')
+const scriptFile = ref(null)
+const scriptFileInput = ref(null)
+const existingScriptFile = ref('')
+
+function scriptFileName(value) {
+  if (!value) return ''
+  return decodeURIComponent(value.split('?')[0].split('/').pop())
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} КБ`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`
+}
+
+function chooseScriptFile(event) {
+  const [file] = event.target.files
+  if (file && file.size > 20 * 1024 * 1024) {
+    saveError.value = 'Размер файла не должен превышать 20 МБ.'
+    event.target.value = ''
+    scriptFile.value = null
+    return
+  }
+  saveError.value = ''
+  scriptFile.value = file || null
+}
+
+function clearSelectedScriptFile() {
+  scriptFile.value = null
+  if (scriptFileInput.value) scriptFileInput.value.value = ''
+}
 
 const DESCRIPTION_TEMPLATES = {
   reels: `Цель ролика:
@@ -147,6 +178,9 @@ function openCreate() {
   editingId.value = null
   saveError.value = ''
   Object.assign(form, blank)
+  scriptMode.value = 'manual'
+  existingScriptFile.value = ''
+  clearSelectedScriptFile()
   itemModal.value = true
 }
 async function openEdit(item) {
@@ -160,6 +194,9 @@ async function openEdit(item) {
     comments: item.comments,
     review_feedback: item.review_feedback || '', publication_url: item.publication_url || '',
   })
+  existingScriptFile.value = item.script_file || ''
+  scriptMode.value = item.script_file ? 'file' : 'manual'
+  clearSelectedScriptFile()
   for (const key of Object.keys(metricForm)) metricForm[key] = Number(item[`metric_${key}`] || 0)
   itemModal.value = true
   try {
@@ -171,17 +208,40 @@ async function openEdit(item) {
 }
 
 async function saveItem() {
+  if (scriptMode.value === 'file' && !scriptFile.value && !existingScriptFile.value) {
+    saveError.value = 'Выберите файл сценария.'
+    return
+  }
   saving.value = true
   saveError.value = ''
   try {
     // пустые даты/исполнитель должны уходить как null, а не как ""
-    const payload = { ...form, brand: props.brand.id }
+    const payload = {
+      ...form,
+      // Пока загрузка нового файла не завершилась, не затираем уже написанный текст.
+      description: scriptMode.value === 'manual' || scriptFile.value ? form.description : '',
+      brand: props.brand.id,
+    }
     for (const key of ['shooting_date', 'editing_deadline', 'publish_date', 'assignee']) {
       if (payload[key] === '' || payload[key] === undefined) payload[key] = null
     }
-    if (editingId.value) await api.patch(`/content/${editingId.value}/`, payload)
-    else await api.post('/content/', payload)
+    let itemId = editingId.value
+    if (itemId) await api.patch(`/content/${itemId}/`, payload)
+    else {
+      const { data } = await api.post('/content/', payload)
+      itemId = data.id
+      editingId.value = itemId
+    }
+
+    if (scriptMode.value === 'file' && scriptFile.value) {
+      const filePayload = new FormData()
+      filePayload.append('file', scriptFile.value)
+      await api.post(`/content/${itemId}/script-file/`, filePayload)
+    } else if (scriptMode.value === 'manual' && existingScriptFile.value) {
+      await api.delete(`/content/${itemId}/script-file/`)
+    }
     itemModal.value = false
+    clearSelectedScriptFile()
     await load()
   } catch (e) {
     const data = e.response?.data
@@ -315,6 +375,7 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
             <td class="title-cell">
               <span v-if="item.generated_by_ai" class="ai-dot" title="Идея от AI"><AppIcon name="sparkles" :size="14" /></span>
               {{ item.title }}
+              <AppIcon v-if="item.script_file" name="paperclip" :size="14" class="file-mark" />
             </td>
             <td>{{ CONTENT_FORMAT[item.format] }}</td>
             <td>
@@ -354,7 +415,7 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
         <div class="kanban-items">
           <article v-for="item in column.items" :key="item.id" class="kanban-card" @click="canEdit && openEdit(item)">
             <div><strong>{{ item.title }}</strong><span>{{ CONTENT_FORMAT[item.format] }}</span></div>
-            <p>{{ item.description || 'Описание не добавлено' }}</p>
+            <p>{{ item.description || (item.script_file ? `Файл: ${scriptFileName(item.script_file)}` : 'Описание не добавлено') }}</p>
             <footer><span v-if="item.assignee_detail" class="assignee"><UserAvatar :user="item.assignee_detail" :size="22" />{{ item.assignee_detail.full_name.split(' ')[0] }}</span><span>{{ fmtDate(item.publish_date, true) }}</span></footer>
           </article>
           <p v-if="!column.items.length" class="kanban-empty">Пусто</p>
@@ -401,19 +462,54 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
           <div class="script-heading">
             <div>
               <label class="field">Сценарий и техническое задание</label>
-              <span>Опишите кадры, реплики, монтаж, реквизит и CTA — текст сохраняется полностью.</span>
+              <span>Добавьте сценарий удобным способом: текстом в CRM или отдельным документом.</span>
             </div>
-            <button type="button" class="btn soft sm" @click="insertDescriptionTemplate">
+            <button v-if="scriptMode === 'manual'" type="button" class="btn soft sm" @click="insertDescriptionTemplate">
               <AppIcon name="edit" :size="15" /> {{ descriptionTemplateLabel }}
             </button>
           </div>
-          <textarea
-            v-model="form.description" class="textarea script-textarea" rows="14"
-            placeholder="Например: Кадр 1 — крупный план продукта; действие; реплика; движение камеры…"
-          />
-          <div class="editor-meta">
-            <span>Можно вставлять ссылки и разбивать сценарий на любое количество кадров</span>
-            <span>{{ form.description.length.toLocaleString('ru-RU') }} символов</span>
+          <div class="script-mode-toggle" role="group" aria-label="Способ добавления сценария">
+            <button type="button" :class="{ on: scriptMode === 'manual' }" @click="scriptMode = 'manual'">
+              <AppIcon name="edit" :size="15" /> Написать вручную
+            </button>
+            <button type="button" :class="{ on: scriptMode === 'file' }" @click="scriptMode = 'file'">
+              <AppIcon name="paperclip" :size="15" /> Прикрепить файл
+            </button>
+          </div>
+          <template v-if="scriptMode === 'manual'">
+            <textarea
+              v-model="form.description" class="textarea script-textarea" rows="14"
+              placeholder="Например: Кадр 1 — крупный план продукта; действие; реплика; движение камеры…"
+            />
+            <div class="editor-meta">
+              <span>Можно вставлять ссылки и разбивать сценарий на любое количество кадров</span>
+              <span>{{ form.description.length.toLocaleString('ru-RU') }} символов</span>
+            </div>
+          </template>
+          <div v-else class="script-upload">
+            <input
+              ref="scriptFileInput" type="file" class="visually-hidden"
+              accept=".pdf,.doc,.docx,.txt,.rtf,.odt,.xls,.xlsx,.csv,.ppt,.pptx"
+              @change="chooseScriptFile"
+            />
+            <div v-if="scriptFile" class="selected-file">
+              <span class="file-icon"><AppIcon name="paperclip" :size="21" /></span>
+              <div><strong>{{ scriptFile.name }}</strong><span>{{ formatFileSize(scriptFile.size) }} · будет загружен при сохранении</span></div>
+              <button type="button" title="Убрать выбранный файл" @click="clearSelectedScriptFile"><AppIcon name="close" :size="17" /></button>
+            </div>
+            <div v-else-if="existingScriptFile" class="selected-file">
+              <span class="file-icon"><AppIcon name="paperclip" :size="21" /></span>
+              <div><strong>{{ scriptFileName(existingScriptFile) }}</strong><a :href="existingScriptFile" target="_blank" rel="noopener">Открыть текущий файл</a></div>
+              <button type="button" title="Выбрать другой файл" @click="scriptFileInput?.click()"><AppIcon name="edit" :size="17" /></button>
+            </div>
+            <button v-else type="button" class="upload-empty" @click="scriptFileInput?.click()">
+              <span class="file-icon"><AppIcon name="paperclip" :size="22" /></span>
+              <strong>Выбрать файл сценария</strong>
+              <span>PDF, Word, таблица, презентация или текст · до 20 МБ</span>
+            </button>
+            <button v-if="scriptFile || existingScriptFile" type="button" class="replace-file" @click="scriptFileInput?.click()">
+              {{ scriptFile ? 'Выбрать другой файл' : 'Заменить файл' }}
+            </button>
           </div>
         </div>
         <div class="row3">
@@ -531,6 +627,7 @@ tbody tr:last-child td { border-bottom: 0; }
 }
 .title-cell { font-weight: 600; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
 .ai-dot { color: var(--violet); margin-right: 3px; }
+.file-mark { margin-left: 5px; color: var(--accent); }
 .kanban { display: grid; grid-template-columns: repeat(7, minmax(250px, 1fr)); gap: 10px; overflow-x: auto; padding-bottom: 8px; }
 .kanban-column { min-height: 330px; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--sunken); }
 .kanban-column>header { display: flex; align-items: center; gap: 7px; padding: 2px 2px 10px; font-size: .78rem; }
@@ -597,6 +694,9 @@ tbody tr:last-child td { border-bottom: 0; }
 .script-heading .field { margin-bottom: 3px; }
 .script-heading span { display: block; color: var(--muted); font-size: 0.76rem; line-height: 1.4; }
 .script-heading .btn { flex: none; }
+.script-mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 11px; border-radius: 11px; background: var(--surface); }
+.script-mode-toggle button { display: inline-flex; min-height: 39px; align-items: center; justify-content: center; gap: 7px; padding: 7px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.script-mode-toggle button.on { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent); }
 .script-textarea {
   min-height: 310px;
   resize: vertical;
@@ -606,6 +706,19 @@ tbody tr:last-child td { border-bottom: 0; }
   tab-size: 2;
 }
 .editor-meta { display: flex; justify-content: space-between; gap: 16px; margin-top: 7px; color: var(--muted); font-size: 0.7rem; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.script-upload { display: flex; flex-direction: column; gap: 9px; }
+.upload-empty { display: flex; min-height: 150px; align-items: center; justify-content: center; flex-direction: column; gap: 5px; padding: 22px; border: 1px dashed color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 12px; background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.upload-empty > span:last-child { color: var(--muted); font-size: .72rem; }
+.file-icon { display: grid; width: 40px; height: 40px; flex: none; place-items: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
+.selected-file { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.selected-file > div { min-width: 0; }
+.selected-file strong,.selected-file span,.selected-file a { display: block; }
+.selected-file strong { overflow: hidden; font-size: .84rem; text-overflow: ellipsis; white-space: nowrap; }
+.selected-file div span,.selected-file a { margin-top: 3px; color: var(--muted); font-size: .71rem; }
+.selected-file a { color: var(--accent); text-decoration: none; }
+.selected-file > button { display: grid; width: 34px; height: 34px; place-items: center; border: 0; border-radius: 9px; background: var(--sunken); color: var(--muted); cursor: pointer; }
+.replace-file { align-self: flex-start; padding: 4px 0; border: 0; background: transparent; color: var(--accent); font: inherit; font-size: .75rem; font-weight: 700; cursor: pointer; }
 .auto-mark {
   display: inline-grid; place-items: center;
   width: 16px; height: 16px; margin-left: 5px;
@@ -676,6 +789,7 @@ tbody tr:last-child td { border-bottom: 0; }
   .script-field { padding: 11px; }
   .script-heading { flex-direction: column; }
   .script-heading .btn { width: 100%; }
+  .script-mode-toggle { grid-template-columns: 1fr; }
   .script-textarea { min-height: 360px; }
   .editor-meta { flex-direction: column; gap: 2px; }
   .prio-row { align-items: stretch; flex-direction: column; }
