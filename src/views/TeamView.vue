@@ -277,7 +277,7 @@ async function save() {
 /* ---- модалка статистики ---- */
 .coin-hero {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
   border-radius: var(--radius-sm);
