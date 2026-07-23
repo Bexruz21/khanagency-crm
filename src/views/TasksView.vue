@@ -43,6 +43,7 @@ const detailOpeningId = ref(null)
 let syncTimer = null
 let syncInFlight = false
 let suppressCardClick = false
+let detailSession = 0
 
 const isDetailAssignee = computed(() => detail.value?.assignee === auth.user?.id)
 const isDetailCreator = computed(() => detail.value?.creator === auth.user?.id)
@@ -65,6 +66,16 @@ function fillDetailEdit(task) {
     assignee: task.assignee,
     deadline: compactDateTime(task.deadline),
   })
+}
+
+function pmTaskRelation(task) {
+  if (!isPm.value || !task) return null
+  const assignedToMe = task.assignee === auth.user?.id
+  const createdByMe = task.creator === auth.user?.id
+  if (assignedToMe && createdByMe) return { key: 'self', label: 'Назначено себе' }
+  if (assignedToMe) return { key: 'assigned', label: 'Мне назначено' }
+  if (createdByMe) return { key: 'created', label: 'Выдано мной' }
+  return null
 }
 
 async function load() {
@@ -97,9 +108,14 @@ async function syncFromServer() {
   syncInFlight = true
   try {
     await load()
-    if (detail.value) {
-      const { data } = await api.get(`/tasks/${detail.value.id}/`)
-      detail.value = data
+    const taskId = detail.value?.id
+    const session = detailSession
+    if (taskId && detailOpeningId.value === null) {
+      const { data } = await api.get(`/tasks/${taskId}/`)
+      // Модалку могли закрыть, пока запрос выполнялся — устаревший ответ не открывает её снова.
+      if (detailSession === session && detail.value?.id === taskId) {
+        detail.value = data
+      }
     }
   } finally {
     syncInFlight = false
@@ -176,12 +192,13 @@ async function createTask() {
 }
 
 async function openDetail(task) {
-  if (suppressCardClick || detail.value || detailOpeningId.value !== null) return
+  if (suppressCardClick || createModal.value || detail.value || detailOpeningId.value !== null) return
+  const session = ++detailSession
   detailOpeningId.value = task.id
   try {
     const { data } = await api.get(`/tasks/${task.id}/`)
     // Если пользователь успел уйти со страницы, устаревший ответ не открывает окно.
-    if (detailOpeningId.value === task.id) {
+    if (detailSession === session && detailOpeningId.value === task.id && !detail.value) {
       detail.value = data
       fillDetailEdit(data)
     }
@@ -191,7 +208,11 @@ async function openDetail(task) {
 }
 
 async function refreshDetail() {
-  const { data } = await api.get(`/tasks/${detail.value.id}/`)
+  const taskId = detail.value?.id
+  if (!taskId) return
+  const session = detailSession
+  const { data } = await api.get(`/tasks/${taskId}/`)
+  if (detailSession !== session || detail.value?.id !== taskId) return
   detail.value = data
   fillDetailEdit(data)
   await load()
@@ -216,6 +237,8 @@ async function saveDetailData() {
 }
 
 function closeDetail() {
+  detailSession += 1
+  detailOpeningId.value = null
   Object.assign(detailEdit, { title: '', description: '', brand: null, assignee: null, deadline: '' })
   detail.value = null
 }
@@ -252,7 +275,7 @@ async function uploadFile(e) {
 
 async function removeTask() {
   await api.delete(`/tasks/${detail.value.id}/`)
-  detail.value = null
+  closeDetail()
   await load()
 }
 
@@ -310,6 +333,9 @@ function fileName(url) {
           >
             <div class="task-top">
               <StatusBadge v-if="t.status !== 'done'" :map="PRIORITY" :value="t.priority" />
+              <span v-if="pmTaskRelation(t)" class="relation-badge" :class="pmTaskRelation(t).key">
+                {{ pmTaskRelation(t).label }}
+              </span>
               <span v-if="t.is_overdue" class="badge" style="background: var(--red-soft); color: var(--red)">просрочено</span>
             </div>
             <h4>{{ t.title }}</h4>
@@ -359,6 +385,11 @@ function fileName(url) {
     <!-- ===== детали ===== -->
     <AppModal :open="!!detail" :title="detail?.title || ''" width="680px" @close="closeDetail">
       <div v-if="detail" class="detail">
+        <div v-if="pmTaskRelation(detail)" class="detail-relation">
+          <span class="relation-badge" :class="pmTaskRelation(detail).key">{{ pmTaskRelation(detail).label }}</span>
+          <small>{{ pmTaskRelation(detail).key === 'created' ? 'Вы контролируете эту задачу' : 'Вы исполнитель этой задачи' }}</small>
+        </div>
+
         <!-- workflow: назначенный исполнитель ведёт задачу до проверки -->
         <div v-if="usesAssigneeWorkflow" class="workflow">
           <template v-if="detail.status === 'todo'">
@@ -522,7 +553,11 @@ function fileName(url) {
 @media (hover: hover) and (pointer: fine) {
   .task:hover { box-shadow: var(--shadow-md); }
 }
-.task-top { display: flex; gap: 6px; margin-bottom: 7px; }
+.task-top { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 7px; }
+.relation-badge { display: inline-flex; min-height: 22px; align-items: center; padding: 3px 8px; border-radius: 99px; font-size: .66rem; font-weight: 750; line-height: 1; white-space: nowrap; }
+.relation-badge.assigned { background: var(--accent-soft); color: var(--accent); }
+.relation-badge.created { background: var(--amber-soft); color: var(--amber); }
+.relation-badge.self { background: var(--violet-soft); color: var(--violet); }
 .task h4 { font-size: 0.92rem; line-height: 1.3; }
 .proj { color: var(--muted); font-size: 0.78rem; }
 .task-bottom { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
@@ -541,6 +576,8 @@ function fileName(url) {
 .auto-priority-value > span { color: var(--muted); font-size: .7rem; font-weight: 650; }
 
 .detail h4 { font-size: 0.88rem; margin: 18px 0 8px; color: var(--ink-2); }
+.detail-relation { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
+.detail-relation small { color: var(--muted); font-size: .72rem; }
 .workflow {
   display: flex;
   align-items: center;

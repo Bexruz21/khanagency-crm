@@ -15,6 +15,17 @@ const detail = ref(null)
 const detailLoadingId = ref(null)
 const filters = reactive({ date_from: '', date_to: '', brand: '', assignee: '' })
 const isEmployee = computed(() => auth.user?.role === 'employee')
+const isPm = computed(() => auth.user?.role === 'pm')
+
+function pmTaskRelation(task) {
+  if (!isPm.value || !task) return null
+  const assignedToMe = task.assignee === auth.user?.id
+  const createdByMe = task.creator === auth.user?.id
+  if (assignedToMe && createdByMe) return { key: 'self', label: 'Назначено себе' }
+  if (assignedToMe) return { key: 'assigned', label: 'Мне назначено' }
+  if (createdByMe) return { key: 'created', label: 'Выдано мной' }
+  return null
+}
 
 async function load() {
   loading.value = true
@@ -102,7 +113,10 @@ onMounted(load)
         <tbody>
           <tr v-for="task in items" :key="task.id" class="task-row" tabindex="0"
             :aria-label="`Открыть задачу ${task.title}`" @click="openDetail(task)" @keydown.enter="openDetail(task)">
-            <td class="title-cell">{{ task.title }}</td>
+            <td class="title-cell">
+              <strong>{{ task.title }}</strong>
+              <span v-if="pmTaskRelation(task)" class="relation-badge" :class="pmTaskRelation(task).key">{{ pmTaskRelation(task).label }}</span>
+            </td>
             <td>{{ task.brand_name || '—' }}</td>
             <td>
               <div class="person">
@@ -125,6 +139,7 @@ onMounted(load)
       <div v-if="detail" class="detail-body">
         <div class="detail-statuses">
           <span class="badge" :style="{ color: TASK_STATUS[detail.status]?.color, background: TASK_STATUS[detail.status]?.bg }">{{ TASK_STATUS[detail.status]?.label }}</span>
+          <span v-if="pmTaskRelation(detail)" class="relation-badge" :class="pmTaskRelation(detail).key">{{ pmTaskRelation(detail).label }}</span>
         </div>
 
         <div class="detail-grid">
@@ -225,6 +240,12 @@ tbody tr:last-child td { border-bottom: 0; }
 .task-row { cursor: pointer; transition: background 140ms ease; }
 .task-row:hover, .task-row:focus-visible { background: var(--sunken); outline: none; }
 .title-cell { font-weight: 650; white-space: normal; overflow-wrap: anywhere; }
+.title-cell > strong { display: block; }
+.relation-badge { display: inline-flex; min-height: 22px; align-items: center; padding: 3px 8px; margin-top: 5px; border-radius: 99px; font-size: .66rem; font-weight: 750; line-height: 1; white-space: nowrap; }
+.relation-badge.assigned { background: var(--accent-soft); color: var(--accent); }
+.relation-badge.created { background: var(--amber-soft); color: var(--amber); }
+.relation-badge.self { background: var(--violet-soft); color: var(--violet); }
+.detail-statuses .relation-badge { margin-top: 0; }
 .person { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .person > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .positive { color: var(--green); font-weight: 650; }
