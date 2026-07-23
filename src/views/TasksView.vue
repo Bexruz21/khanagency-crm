@@ -12,6 +12,8 @@ import { useToastStore } from '../stores/toasts'
 const auth = useAuthStore()
 const toasts = useToastStore()
 const isEmployee = computed(() => auth.user?.role === 'employee')
+const isPm = computed(() => auth.user?.role === 'pm')
+const isAdmin = computed(() => auth.user?.role === 'admin')
 
 const tasks = ref(null)
 const users = ref([])
@@ -33,15 +35,37 @@ const blank = { title: '', description: '', brand: null, assignee: null, deadlin
 const form = reactive({ ...blank })
 
 const detail = ref(null)       // подробная задача
-const detailDeadline = ref('')
-const deadlineEditing = ref(false)
-const deadlineSaving = ref(false)
+const detailEdit = reactive({ title: '', description: '', brand: null, assignee: null, deadline: '' })
+const detailSaving = ref(false)
 const commentText = ref('')
 const fileInput = ref(null)
 const detailOpeningId = ref(null)
 let syncTimer = null
 let syncInFlight = false
 let suppressCardClick = false
+
+const isDetailAssignee = computed(() => detail.value?.assignee === auth.user?.id)
+const isDetailCreator = computed(() => detail.value?.creator === auth.user?.id)
+const usesAssigneeWorkflow = computed(() => isEmployee.value || (isPm.value && isDetailAssignee.value))
+const canReviewDetail = computed(() =>
+  isAdmin.value || (isPm.value && isDetailCreator.value && !isDetailAssignee.value)
+)
+const canEditDetail = computed(() =>
+  isAdmin.value || (isPm.value && isDetailCreator.value && !isDetailAssignee.value)
+)
+const canDeleteDetail = computed(() =>
+  isAdmin.value || (isPm.value && isDetailCreator.value && !isDetailAssignee.value)
+)
+
+function fillDetailEdit(task) {
+  Object.assign(detailEdit, {
+    title: task.title || '',
+    description: task.description || '',
+    brand: task.brand,
+    assignee: task.assignee,
+    deadline: compactDateTime(task.deadline),
+  })
+}
 
 async function load() {
   const params = new URLSearchParams()
@@ -76,7 +100,6 @@ async function syncFromServer() {
     if (detail.value) {
       const { data } = await api.get(`/tasks/${detail.value.id}/`)
       detail.value = data
-      if (!deadlineEditing.value) detailDeadline.value = compactDateTime(data.deadline)
     }
   } finally {
     syncInFlight = false
@@ -107,8 +130,8 @@ function isToday(value) {
 const dragId = ref(null)
 const dragOver = ref('')
 async function onDrop(status) {
-  // сотрудник двигает задачи только кнопками «Взять в работу» / «На проверку»
-  if (isEmployee.value) return
+  // Свободное перемещение по колонкам доступно только администратору.
+  if (!isAdmin.value) return
   const task = tasks.value.find((t) => t.id === dragId.value)
   dragOver.value = ''
   if (!task || task.status === 'done' || task.status === status) return
@@ -160,7 +183,7 @@ async function openDetail(task) {
     // Если пользователь успел уйти со страницы, устаревший ответ не открывает окно.
     if (detailOpeningId.value === task.id) {
       detail.value = data
-      detailDeadline.value = compactDateTime(data.deadline)
+      fillDetailEdit(data)
     }
   } finally {
     if (detailOpeningId.value === task.id) detailOpeningId.value = null
@@ -170,30 +193,30 @@ async function openDetail(task) {
 async function refreshDetail() {
   const { data } = await api.get(`/tasks/${detail.value.id}/`)
   detail.value = data
-  if (!deadlineEditing.value) detailDeadline.value = compactDateTime(data.deadline)
+  fillDetailEdit(data)
   await load()
 }
 
-async function saveDetailDeadline() {
-  if (!detail.value || deadlineSaving.value) return
-  const next = detailDeadline.value || null
-  if (next === compactDateTime(detail.value.deadline)) {
-    deadlineEditing.value = false
-    return
-  }
-  deadlineSaving.value = true
+async function saveDetailData() {
+  if (!detail.value || detailSaving.value || !detailEdit.title.trim()) return
+  detailSaving.value = true
   try {
-    await api.patch(`/tasks/${detail.value.id}/`, { deadline: next })
-    deadlineEditing.value = false
+    await api.patch(`/tasks/${detail.value.id}/`, {
+      title: detailEdit.title.trim(),
+      description: detailEdit.description.trim(),
+      brand: detailEdit.brand || null,
+      assignee: detailEdit.assignee || null,
+      deadline: detailEdit.deadline || null,
+    })
+    toasts.push('Изменения задачи сохранены.', 'success')
     await refreshDetail()
   } finally {
-    deadlineSaving.value = false
+    detailSaving.value = false
   }
 }
 
 function closeDetail() {
-  deadlineEditing.value = false
-  detailDeadline.value = ''
+  Object.assign(detailEdit, { title: '', description: '', brand: null, assignee: null, deadline: '' })
   detail.value = null
 }
 
@@ -241,7 +264,7 @@ function fileName(url) {
 <template>
   <div class="tasks-page">
     <div class="head">
-      <h1 class="page-title" style="margin: 0">{{ isEmployee ? 'Мои задачи' : 'Задачи' }}</h1>
+      <h1 class="page-title" style="margin: 0">{{ isEmployee ? 'Мои задачи' : isPm ? 'Мои и выданные задачи' : 'Задачи' }}</h1>
       <div class="filters">
         <select v-model="filterBrand" class="select" @change="load">
           <option value="">Все проекты</option>
@@ -279,7 +302,8 @@ function fileName(url) {
           <article
             v-for="t in byColumn[col.id]" :key="t.id"
             class="card task flip-move"
-            :draggable="!isEmployee && t.status !== 'done'"
+            :class="{ locked: !isAdmin }"
+            :draggable="isAdmin && t.status !== 'done'"
             @dragstart="onDragStart(t.id)"
             @dragend="onDragEnd"
             @click="openDetail(t)"
@@ -335,8 +359,8 @@ function fileName(url) {
     <!-- ===== детали ===== -->
     <AppModal :open="!!detail" :title="detail?.title || ''" width="680px" @close="closeDetail">
       <div v-if="detail" class="detail">
-        <!-- workflow: сотрудник ведёт задачу до проверки, менеджер одобряет -->
-        <div v-if="isEmployee" class="workflow">
+        <!-- workflow: назначенный исполнитель ведёт задачу до проверки -->
+        <div v-if="usesAssigneeWorkflow" class="workflow">
           <template v-if="detail.status === 'todo'">
             <button class="btn" @click="setDetailStatus('in_progress')">▶ Взять в работу</button>
           </template>
@@ -351,35 +375,42 @@ function fileName(url) {
           </template>
         </div>
 
-        <div v-else-if="detail.status === 'review'" class="workflow manager">
-          <span class="wf-note violet">Сотрудник отправил задачу на проверку</span>
+        <div v-else-if="canReviewDetail && detail.status === 'review'" class="workflow manager">
+          <span class="wf-note violet">Исполнитель отправил задачу на проверку</span>
           <button class="btn" style="background: var(--green)" @click="setDetailStatus('done')"><AppIcon name="check" :size="17" /> Принять</button>
           <button class="btn outline" @click="setDetailStatus('in_progress')"><AppIcon name="edit" :size="17" /> Вернуть на доработку</button>
         </div>
 
         <div v-if="detail.status === 'done'" class="workflow archive-workflow">
-          <span v-if="!isEmployee" class="wf-note green"><AppIcon name="check" :size="17" /> Выполненная задача останется сегодня или может быть архивирована сейчас</span>
+          <span v-if="!usesAssigneeWorkflow" class="wf-note green"><AppIcon name="check" :size="17" /> Выполненная задача останется сегодня или может быть архивирована сейчас</span>
           <button class="btn outline" @click="archiveDetail"><AppIcon name="archive" :size="17" /> В архив</button>
         </div>
 
-        <div v-if="!isEmployee" class="detail-controls">
-          <div>
-            <label class="field">Дедлайн</label>
-            <input class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ"
-              :value="detailDeadline" :disabled="deadlineSaving"
-              @focus="deadlineEditing = true" @keydown="allowCompactDateKey"
-              @input="$event.target.value = detailDeadline = maskCompactDateTime($event.target.value)"
-              @blur="saveDetailDeadline" @keydown.enter="$event.target.blur()" />
+        <div v-if="canEditDetail" class="detail-edit">
+          <div class="span-2">
+            <label class="field">Название</label>
+            <input v-model="detailEdit.title" class="input" />
+          </div>
+          <div class="span-2">
+            <label class="field">Описание</label>
+            <textarea v-model="detailEdit.description" class="textarea" rows="3" />
           </div>
           <div>
-            <label class="field">Статус</label>
-            <select class="select" :value="detail.status" :disabled="detail.status === 'done'" @change="patchDetail({ status: $event.target.value })">
-              <option v-for="(v, k) in TASK_STATUS" :key="k" :value="k">{{ v.label }}</option>
+            <label class="field">Проект</label>
+            <select v-model="detailEdit.brand" class="select">
+              <option :value="null">—</option>
+              <option v-for="b in brands" :key="b.id" :value="b.id">{{ b.name }}</option>
             </select>
+          </div>
+          <div>
+            <label class="field">Дедлайн</label>
+            <input :value="detailEdit.deadline" class="input" inputmode="numeric" maxlength="11"
+              placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey"
+              @input="$event.target.value = detailEdit.deadline = maskCompactDateTime($event.target.value)" />
           </div>
           <div v-if="detail.status !== 'done'">
             <label class="field">Исполнитель</label>
-            <select class="select" :value="detail.assignee" @change="patchDetail({ assignee: $event.target.value || null })">
+            <select v-model="detailEdit.assignee" class="select">
               <option :value="null">—</option>
               <option v-for="u in users" :key="u.id" :value="u.id">{{ u.full_name }}</option>
             </select>
@@ -388,10 +419,22 @@ function fileName(url) {
             <label class="field">Приоритет</label>
             <div class="auto-priority-value"><StatusBadge :map="PRIORITY" :value="detail.priority" /><span>Автоматически</span></div>
           </div>
+          <div v-if="isAdmin" class="span-2 admin-status">
+            <label class="field">Статус (администратор)</label>
+            <select class="select" :value="detail.status" :disabled="detail.status === 'done'" @change="patchDetail({ status: $event.target.value })">
+              <option v-for="(v, k) in TASK_STATUS" :key="k" :value="k">{{ v.label }}</option>
+            </select>
+          </div>
+          <div class="span-2 edit-actions">
+            <button class="btn" :disabled="detailSaving || !detailEdit.title.trim()" @click="saveDetailData">
+              {{ detailSaving ? 'Сохраняем…' : 'Сохранить изменения' }}
+            </button>
+          </div>
         </div>
 
-        <p v-if="detail.description" class="desc">{{ detail.description }}</p>
+        <p v-if="detail.description && !canEditDetail" class="desc">{{ detail.description }}</p>
         <p class="meta">
+          Статус: <strong>{{ TASK_STATUS[detail.status]?.label || detail.status }}</strong> ·
           Проект: <strong>{{ detail.brand_name || '—' }}</strong> ·
           Дедлайн: <strong :style="detail.is_overdue ? 'color: var(--red)' : ''">{{ fmtDate(detail.deadline, true) }}</strong> ·
           Создал: <strong>{{ detail.creator_detail?.full_name || '—' }}</strong>
@@ -430,8 +473,8 @@ function fileName(url) {
         </ul>
       </div>
       <template #footer>
-        <button v-if="!isEmployee" class="btn danger" style="margin-right: auto" @click="removeTask">Удалить</button>
-        <button class="btn outline" @click="detail = null">Закрыть</button>
+        <button v-if="canDeleteDetail" class="btn danger" style="margin-right: auto" @click="removeTask">Удалить</button>
+        <button class="btn outline" @click="closeDetail">Закрыть</button>
       </template>
     </AppModal>
   </div>
@@ -473,6 +516,8 @@ function fileName(url) {
   cursor: grab;
   transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) ease;
 }
+.task.locked { cursor: pointer; }
+.task.locked:active { cursor: pointer; }
 .task:active { cursor: grabbing; transform: scale(0.98); }
 @media (hover: hover) and (pointer: fine) {
   .task:hover { box-shadow: var(--shadow-md); }
@@ -510,7 +555,11 @@ function fileName(url) {
 .wf-note.violet { color: var(--violet); }
 .wf-note.green { color: var(--green); }
 .workflow.manager .wf-note { margin-right: auto; }
-.detail-controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.detail-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--sunken); }
+.detail-edit .span-2 { grid-column: 1 / -1; }
+.detail-edit .textarea { min-height: 82px; resize: vertical; }
+.admin-status { max-width: 280px; }
+.edit-actions { display: flex; justify-content: flex-end; }
 .desc { margin-top: 14px; font-size: 0.92rem; white-space: pre-line; }
 .meta { color: var(--muted); font-size: 0.84rem; margin-top: 10px; }
 .meta strong { color: var(--ink-2); }
@@ -548,7 +597,10 @@ function fileName(url) {
   .board { grid-template-columns: 1fr; gap: 10px; }
   .column { min-height: 120px; padding: 9px; }
   .task { padding: 14px; }
-  .row2, .detail-controls { grid-template-columns: 1fr; }
+  .row2, .detail-edit { grid-template-columns: 1fr; }
+  .detail-edit .span-2 { grid-column: auto; }
+  .admin-status { max-width: none; }
+  .edit-actions .btn { width: 100%; }
   .workflow { align-items: stretch; padding: 12px; }
   .workflow .btn { width: 100%; }
   .workflow.manager .wf-note { width: 100%; }
