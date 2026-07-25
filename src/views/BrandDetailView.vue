@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toasts'
+import { subscribeRealtime } from '../realtime'
 import AppModal from '../components/AppModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import AppIcon from '../components/AppIcon.vue'
@@ -21,6 +22,7 @@ const brand = ref(null)
 const descriptionExpanded = ref(false)
 const tab = ref('overview')
 const users = ref([])
+let unsubscribeRealtime = null
 const projectManagers = computed(() => users.value.filter((user) => ['admin', 'pm'].includes(user.role)))
 const canEditBrand = computed(() => auth.user?.role === 'admin'
   || (auth.user?.role === 'pm' && Number(brand.value?.manager) === Number(auth.user?.id)))
@@ -61,7 +63,9 @@ onMounted(async () => {
   await load()
   const { data } = await api.get('/users/')
   users.value = data
+  unsubscribeRealtime = subscribeRealtime(['brands', 'tasks'], load)
 })
+onUnmounted(() => unsubscribeRealtime?.())
 
 function openEdit() {
   Object.assign(form, {

@@ -7,11 +7,12 @@ import AppIcon from '../components/AppIcon.vue'
 import EmployeeDashboard from './EmployeeDashboard.vue'
 import { PRIORITY, TASK_STATUS, fmtDate } from '../labels'
 import { useAuthStore } from '../stores/auth'
+import { subscribeRealtime } from '../realtime'
 
 const auth = useAuthStore()
 const data = ref(null)
 const isEmployee = computed(() => auth.user?.role === 'employee')
-let refreshTimer = null
+let unsubscribeRealtime = null
 
 async function load() {
   if (!auth.user) await auth.fetchMe()
@@ -22,11 +23,9 @@ async function load() {
 
 onMounted(async () => {
   await load()
-  if (!isEmployee.value) refreshTimer = setInterval(() => {
-    if (!document.hidden) load()
-  }, 10000)
+  if (!isEmployee.value) unsubscribeRealtime = subscribeRealtime(['tasks', 'brands', 'users'], load)
 })
-onUnmounted(() => clearInterval(refreshTimer))
+onUnmounted(() => unsubscribeRealtime?.())
 
 const statCards = [
   { key: 'brands_active', label: 'Проектов в работе', tone: 'accent' },

@@ -8,6 +8,7 @@ import UserAvatar from '../components/UserAvatar.vue'
 import { PRIORITY, TASK_STATUS, allowCompactDateKey, compactDateTime, fmtDate, maskCompactDateTime } from '../labels'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toasts'
+import { subscribeRealtime } from '../realtime'
 
 const auth = useAuthStore()
 const toasts = useToastStore()
@@ -40,7 +41,7 @@ const detailSaving = ref(false)
 const commentText = ref('')
 const fileInput = ref(null)
 const detailOpeningId = ref(null)
-let syncTimer = null
+let unsubscribeRealtime = null
 let syncInFlight = false
 let suppressCardClick = false
 let detailSession = 0
@@ -94,13 +95,11 @@ onMounted(async () => {
     brands.value = b.data
   }
   await load()
-  syncTimer = setInterval(syncFromServer, 3000)
-  window.addEventListener('focus', syncFromServer)
+  unsubscribeRealtime = subscribeRealtime('tasks', syncFromServer)
 })
 
 onUnmounted(() => {
-  clearInterval(syncTimer)
-  window.removeEventListener('focus', syncFromServer)
+  unsubscribeRealtime?.()
 })
 
 async function syncFromServer() {

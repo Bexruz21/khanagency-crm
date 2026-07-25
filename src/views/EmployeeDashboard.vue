@@ -6,10 +6,11 @@ import KhanCoinIcon from '../components/KhanCoinIcon.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { PRIORITY, TASK_STATUS, fmtDate } from '../labels'
 import { useAuthStore } from '../stores/auth'
+import { subscribeRealtime } from '../realtime'
 
 const auth = useAuthStore()
 const data = ref(null)
-let refreshTimer = null
+let unsubscribeRealtime = null
 
 async function load() {
   const res = await api.get('/tasks/my-stats/')
@@ -18,11 +19,9 @@ async function load() {
 
 onMounted(async () => {
   await load()
-  refreshTimer = setInterval(() => {
-    if (!document.hidden) load()
-  }, 10000)
+  unsubscribeRealtime = subscribeRealtime(['tasks', 'users'], load)
 })
-onUnmounted(() => clearInterval(refreshTimer))
+onUnmounted(() => unsubscribeRealtime?.())
 
 const cards = [
   { key: 'active', label: 'Активных задач', tone: 'accent' },

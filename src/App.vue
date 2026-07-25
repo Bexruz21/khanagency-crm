@@ -4,6 +4,12 @@ import { useRoute } from 'vue-router'
 import api from './api'
 import { useAuthStore } from './stores/auth'
 import { useToastStore } from './stores/toasts'
+import { usePresenceStore } from './stores/presence'
+import {
+  startRealtime,
+  stopRealtime,
+  subscribeRealtimeEvents,
+} from './realtime'
 import KhanLogo from './components/KhanLogo.vue'
 import ToastHost from './components/ToastHost.vue'
 import UserAvatar from './components/UserAvatar.vue'
@@ -12,6 +18,7 @@ import { ROLE } from './labels'
 const route = useRoute()
 const auth = useAuthStore()
 const toasts = useToastStore()
+const presence = usePresenceStore()
 const isLogin = computed(() => route.name === 'login')
 
 const collapsed = ref(localStorage.getItem('khan_sidebar') === '1')
@@ -20,9 +27,19 @@ function toggleSidebar() {
   localStorage.setItem('khan_sidebar', collapsed.value ? '1' : '0')
 }
 
-/* ---- опрос уведомлений: непросмотренные показываем toast'ом ---- */
-let pollTimer = null
+/* ---- WebSocket-уведомления + одноразовая загрузка пропущенных ---- */
 let notificationsLoading = false
+let unsubscribeRealtime = null
+const deliveredNotificationIds = new Set()
+
+function showNotification(notification) {
+  if (deliveredNotificationIds.has(notification.id)) return
+  deliveredNotificationIds.add(notification.id)
+  if (deliveredNotificationIds.size > 500) {
+    deliveredNotificationIds.delete(deliveredNotificationIds.values().next().value)
+  }
+  toasts.push(notification.text, notification.kind, notification.link)
+}
 
 async function pollNotifications() {
   // Не забираем уведомления под экраном входа: раньше они сразу становились seen,
@@ -32,7 +49,7 @@ async function pollNotifications() {
   try {
     const { data } = await api.get('/notifications/unseen/')
     if (data.length) {
-      for (const n of data) toasts.push(n.text, n.kind, n.link)
+      for (const n of data) showNotification(n)
       // Сначала гарантируем отрисовку toast, только затем подтверждаем доставку backend.
       await nextTick()
       await api.post('/notifications/mark-seen/', { ids: data.map((n) => n.id) })
@@ -50,18 +67,54 @@ watch([() => auth.user?.id, () => route.name], ([userId, routeName]) => {
   if (userId && routeName !== 'login') pollNotifications()
 })
 
-function pollWhenVisible() {
-  if (!document.hidden) pollNotifications()
+async function handleRealtime(event) {
+  if (event.type === 'presence.snapshot') {
+    presence.applySnapshot(event.users)
+    return
+  }
+  if (event.type === 'presence.changed') {
+    presence.applyChange(event.user)
+    return
+  }
+  if (event.type === 'auth.failed') {
+    try {
+      await auth.fetchMe()
+    } catch {
+      auth.logout()
+    }
+    return
+  }
+  if (event.type === 'ready') {
+    await pollNotifications()
+    return
+  }
+  if (event.type !== 'notification.created') return
+  const n = event.notification
+  showNotification(n)
+  await nextTick()
+  try {
+    await api.post('/notifications/mark-seen/', { ids: [n.id] })
+  } catch {
+    /* При переподключении непрочитанное уведомление придёт через unseen. */
+  }
 }
 
 onMounted(() => {
   pollNotifications()
-  pollTimer = setInterval(pollNotifications, 3000)
-  document.addEventListener('visibilitychange', pollWhenVisible)
+  unsubscribeRealtime = subscribeRealtimeEvents(handleRealtime)
+  if (auth.isAuthed) startRealtime()
 })
 onUnmounted(() => {
-  clearInterval(pollTimer)
-  document.removeEventListener('visibilitychange', pollWhenVisible)
+  unsubscribeRealtime?.()
+  stopRealtime()
+})
+
+watch(() => auth.isAuthed, (isAuthed) => {
+  if (isAuthed) startRealtime()
+  else {
+    stopRealtime()
+    presence.reset()
+  }
 })
 
 const ICONS = {

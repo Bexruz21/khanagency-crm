@@ -1,7 +1,8 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api, { downloadPdf } from '../api'
+import { subscribeRealtime } from '../realtime'
 import FinanceTab from '../components/brand/FinanceTab.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { formatSum } from '../labels'
@@ -11,6 +12,7 @@ const router = useRouter()
 const overview = ref(null)
 const brand = ref(null)
 const reportLoading = ref(false)
+let unsubscribeRealtime = null
 const isDetail = computed(() => !!route.params.brandId)
 const cards = computed(() => {
   const value = overview.value?.summary || {}
@@ -27,6 +29,16 @@ const cards = computed(() => {
 async function loadOverview() {
   const { data } = await api.get('/expenses/overview/')
   overview.value = data
+}
+
+async function refreshCurrent() {
+  const brandId = route.params.brandId
+  if (brandId) {
+    const { data } = await api.get(`/brands/${brandId}/`)
+    brand.value = data
+  } else {
+    await loadOverview()
+  }
 }
 
 async function downloadOverviewReport() {
@@ -47,6 +59,11 @@ watch(() => route.params.brandId, async (brandId) => {
     await loadOverview()
   }
 }, { immediate: true })
+
+onMounted(() => {
+  unsubscribeRealtime = subscribeRealtime(['finances', 'brands'], refreshCurrent)
+})
+onUnmounted(() => unsubscribeRealtime?.())
 </script>
 
 <template>

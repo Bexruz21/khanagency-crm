@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import api from '../api'
+import { subscribeRealtime } from '../realtime'
 import AppModal from '../components/AppModal.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import { useAuthStore } from '../stores/auth'
@@ -16,6 +17,7 @@ const detailLoadingId = ref(null)
 const filters = reactive({ date_from: '', date_to: '', brand: '', assignee: '' })
 const isEmployee = computed(() => auth.user?.role === 'employee')
 const isPm = computed(() => auth.user?.role === 'pm')
+let unsubscribeRealtime = null
 
 function pmTaskRelation(task) {
   if (!isPm.value || !task) return null
@@ -62,7 +64,11 @@ function fileName(url) {
   return decodeURIComponent(url.split('/').pop().split('?')[0])
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  unsubscribeRealtime = subscribeRealtime('tasks', load)
+})
+onUnmounted(() => unsubscribeRealtime?.())
 </script>
 
 <template>

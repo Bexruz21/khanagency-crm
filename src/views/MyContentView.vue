@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toasts'
+import { subscribeRealtime } from '../realtime'
 import AppIcon from '../components/AppIcon.vue'
 import AppModal from '../components/AppModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -20,6 +21,7 @@ const toasts = useToastStore()
 const items = ref(null)
 const myExpenses = ref(null)
 const loading = ref(false)
+let unsubscribeRealtime = null
 const filterStatus = ref('')
 const filterFormat = ref('')
 const search = ref('')
@@ -103,7 +105,11 @@ async function load() {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  unsubscribeRealtime = subscribeRealtime(['content', 'finances', 'brands'], load)
+})
+onUnmounted(() => unsubscribeRealtime?.())
 watch(() => route.params.brandId, () => {
   filterStatus.value = ''
   filterFormat.value = ''

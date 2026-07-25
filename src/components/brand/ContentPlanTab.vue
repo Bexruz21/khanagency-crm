@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import api, { downloadPdf } from '../../api'
+import { subscribeRealtime } from '../../realtime'
 import AppModal from '../AppModal.vue'
 import AppIcon from '../AppIcon.vue'
 import StatusBadge from '../StatusBadge.vue'
@@ -15,6 +16,7 @@ const viewMode = ref('table')
 const syncingItemId = ref(null)
 const itemHistory = ref([])
 const teamUsers = computed(() => props.brand.members_detail || [])
+let unsubscribeRealtime = null
 
 // --- модалка записи (создание/редактирование) ---
 const itemModal = ref(false)
@@ -172,7 +174,11 @@ async function load() {
   const { data } = await api.get(`/content/?brand=${props.brand.id}`)
   items.value = data
 }
-onMounted(load)
+onMounted(async () => {
+  await load()
+  unsubscribeRealtime = subscribeRealtime('content', load)
+})
+onUnmounted(() => unsubscribeRealtime?.())
 
 function openCreate() {
   editingId.value = null

@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import api from '../api'
+import { subscribeRealtime } from '../realtime'
 import { useAuthStore } from '../stores/auth'
 import AppModal from '../components/AppModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -12,6 +13,7 @@ const auth = useAuthStore()
 const users = ref([])
 const modal = ref(false)
 const saving = ref(false)
+let unsubscribeRealtime = null
 const projectManagers = computed(() => users.value.filter((user) => ['admin', 'pm'].includes(user.role)))
 
 const form = reactive({
@@ -25,7 +27,11 @@ async function load() {
   brands.value = b.data
   users.value = u.data
 }
-onMounted(load)
+onMounted(async () => {
+  await load()
+  unsubscribeRealtime = subscribeRealtime(['brands', 'tasks', 'users'], load)
+})
+onUnmounted(() => unsubscribeRealtime?.())
 
 async function save() {
   saving.value = true

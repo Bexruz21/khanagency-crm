@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import api from '../../api'
+import { subscribeRealtime } from '../../realtime'
 import { useAuthStore } from '../../stores/auth'
 import { useToastStore } from '../../stores/toasts'
 import AppIcon from '../AppIcon.vue'
@@ -24,6 +25,7 @@ const reportLoading = ref(false)
 const error = ref('')
 const filters = reactive({ date_from: '', date_to: '', status: '', created_by: '' })
 const filtersOpen = ref(false)
+let unsubscribeRealtime = null
 
 const today = () => {
   const d = new Date()
@@ -74,7 +76,11 @@ async function loadExpenseAuthors() {
   }
   expenseAuthors.value = [...unique.entries()].map(([id, user]) => ({ id, name: user.full_name || user.username }))
 }
-onMounted(() => Promise.all([load(), loadExpenseAuthors()]))
+onMounted(async () => {
+  await Promise.all([load(), loadExpenseAuthors()])
+  unsubscribeRealtime = subscribeRealtime(['finances', 'content'], () => Promise.all([load(), loadExpenseAuthors()]))
+})
+onUnmounted(() => unsubscribeRealtime?.())
 
 function resetFilters() {
   Object.assign(filters, { date_from: '', date_to: '', status: '', created_by: '' })

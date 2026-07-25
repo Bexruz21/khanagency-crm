@@ -1,14 +1,17 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import api from '../api'
+import { subscribeRealtime } from '../realtime'
 import AppModal from '../components/AppModal.vue'
 import AppIcon from '../components/AppIcon.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import KhanCoinIcon from '../components/KhanCoinIcon.vue'
 import { ROLE, fmtDate } from '../labels'
 import { useAuthStore } from '../stores/auth'
+import { usePresenceStore } from '../stores/presence'
 
 const auth = useAuthStore()
+const presence = usePresenceStore()
 const users = ref(null)
 const workload = ref(null)
 const viewMode = ref('team')
@@ -22,6 +25,29 @@ const visibleUsers = computed(() => {
 const modal = ref(false)
 const saving = ref(false)
 const error = ref('')
+let unsubscribeRealtime = null
+let clockTimer = null
+const clock = ref(Date.now())
+
+function presenceState(user) {
+  return presence.byUser[user.id] || {
+    online: false,
+    last_seen_at: user.last_seen_at,
+  }
+}
+
+function presenceText(user) {
+  const state = presenceState(user)
+  if (state.online) return 'Онлайн'
+  if (!state.last_seen_at) return 'Ещё не заходил'
+  const minutes = Math.max(0, Math.floor((clock.value - new Date(state.last_seen_at).getTime()) / 60000))
+  if (minutes < 1) return 'Был онлайн только что'
+  if (minutes < 60) return `Был онлайн ${minutes} мин назад`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `Был онлайн ${hours} ч назад`
+  const days = Math.floor(hours / 24)
+  return `Был онлайн ${days} дн назад`
+}
 
 // --- статистика сотрудника ---
 const stats = ref(null)
@@ -66,7 +92,15 @@ async function load() {
   users.value = usersResponse.data
   workload.value = workloadResponse.data
 }
-onMounted(load)
+onMounted(async () => {
+  await load()
+  unsubscribeRealtime = subscribeRealtime(['users', 'tasks', 'content'], load)
+  clockTimer = window.setInterval(() => { clock.value = Date.now() }, 30000)
+})
+onUnmounted(() => {
+  unsubscribeRealtime?.()
+  clearInterval(clockTimer)
+})
 
 async function save() {
   if (!isAdmin.value) return
@@ -103,6 +137,7 @@ async function save() {
         <div class="info">
           <strong>{{ u.full_name }}</strong>
           <span class="pos">{{ u.position || '—' }}</span>
+          <span class="presence" :class="{ online: presenceState(u).online }"><i />{{ presenceText(u) }}</span>
           <span class="badge role">{{ ROLE[u.role] }}</span>
         </div>
         <div class="load">
@@ -120,7 +155,7 @@ async function save() {
     <div v-else class="workload-page">
       <div class="workload-legend"><span><i class="green" /> Свободен</span><span><i class="blue" /> Оптимально</span><span><i class="amber" /> Высокая загрузка</span><span><i class="red" /> Перегружен</span></div>
       <article v-for="row in workload" :key="row.user.id" class="card workload-row" @click="openStats(row.user)">
-        <div class="work-person"><UserAvatar :user="row.user" :size="48" /><div><strong>{{ row.user.full_name }}</strong><span>{{ row.user.position || 'Сотрудник' }}</span></div></div>
+        <div class="work-person"><UserAvatar :user="row.user" :size="48" /><div><strong>{{ row.user.full_name }}</strong><span>{{ row.user.position || 'Сотрудник' }}</span><span class="presence" :class="{ online: presenceState(row.user).online }"><i />{{ presenceText(row.user) }}</span></div></div>
         <div class="load-meter"><div><span>Загрузка</span><strong :class="workloadTone(row.level)">{{ row.score }}%</strong></div><div class="meter"><i :class="workloadTone(row.level)" :style="{ width: `${row.score}%` }" /></div><small :class="workloadTone(row.level)">{{ workloadLabels[row.level] }}</small></div>
         <div class="work-counters"><span><strong>{{ row.active_tasks }}</strong> задач</span><span><strong>{{ row.active_content }}</strong> контентов</span><span :class="{ danger: row.overdue_tasks + row.overdue_content }"><strong>{{ row.overdue_tasks + row.overdue_content }}</strong> просрочено</span><span><strong>{{ row.week_tasks + row.week_content }}</strong> на 7 дней</span></div>
         <div class="next-work"><strong>Ближайшее</strong><div v-for="deadline in row.next_deadlines.slice(0, 2)" :key="`${deadline.type}-${deadline.title}-${deadline.date}`"><AppIcon :name="deadline.type === 'task' ? 'check' : 'movie'" :size="14" /><span>{{ deadline.title }}</span><time>{{ fmtDate(deadline.date, true) }}</time></div><span v-if="!row.next_deadlines.length" class="no-deadline">Нет ближайших дедлайнов</span></div>
@@ -237,6 +272,10 @@ async function save() {
 .info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .info strong { font-size: 0.98rem; }
 .pos { color: var(--muted); font-size: 0.82rem; }
+.presence { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 0.74rem; }
+.presence i { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--muted); opacity: 0.55; }
+.presence.online { color: var(--green); font-weight: 650; }
+.presence.online i { background: var(--green); opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 14%, transparent); }
 .role { background: var(--accent-soft); color: var(--accent-ink); align-self: flex-start; margin-top: 3px; }
 
 .load { text-align: center; line-height: 1.1; }
@@ -263,8 +302,10 @@ async function save() {
 .workload-row { display: grid; grid-template-columns: minmax(190px,.9fr) minmax(180px,.8fr) minmax(250px,1fr) minmax(250px,1.1fr); align-items: center; gap: 18px; padding: 15px 17px; cursor: pointer; }
 .work-person { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .work-person>div { min-width: 0; }
-.work-person>div strong,.work-person>div span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-person>div strong,.work-person>div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-person>div strong,.work-person>div>span:not(.presence) { display: block; }
 .work-person>div span { margin-top: 3px; color: var(--muted); font-size: .72rem; }
+.work-person>div .presence { display: flex; }
 .work-person :deep(.avatar) { display: inline-flex; flex: 0 0 48px; border: 3px solid var(--surface-solid); box-shadow: 0 0 0 1px var(--line), 0 4px 12px rgb(0 0 0 / .08); }
 .load-meter>div:first-child { display: flex; justify-content: space-between; color: var(--muted); font-size: .72rem; }
 .load-meter strong { font-size: .82rem; }.load-meter small { display: block; margin-top: 4px; font-size: .66rem; font-weight: 700; }
