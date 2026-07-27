@@ -376,7 +376,8 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
     width: auto;
     height: 68px;
     padding: 7px 8px;
-    border-radius: 21px;
+    border-radius: 26px;
+    corner-shape: squircle;
     flex-direction: row;
     align-items: center;
     gap: 4px;
