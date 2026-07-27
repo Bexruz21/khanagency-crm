@@ -376,7 +376,7 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
     width: auto;
     height: 68px;
     padding: 7px 8px;
-    border-radius: 26px;
+    border-radius: 30px;
     corner-shape: squircle;
     flex-direction: row;
     align-items: center;
@@ -396,7 +396,8 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
     flex-direction: row;
     justify-content: center;
     gap: 0;
-    border-radius: 14px;
+    border-radius: 22px;
+    corner-shape: squircle;
   }
   .nav-item svg { width: 23px; height: 23px; }
   .nav-item .label, .collapsed .nav-item .label { display: none; }
