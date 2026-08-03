@@ -55,7 +55,7 @@ const isDetailAssignee = computed(() => detail.value?.assignee === auth.user?.id
 const isDetailCreator = computed(() => detail.value?.creator === auth.user?.id)
 const isDetailParticipant = computed(() => detail.value?.participants?.includes(auth.user?.id))
 const usesAssigneeWorkflow = computed(() => isDetailAssignee.value)
-const employees = computed(() => users.value.filter((user) => user.role === 'employee'))
+const participantCandidates = computed(() => users.value.filter((user) => user.is_active !== false))
 const canReviewDetail = computed(() =>
   isAdmin.value || (isPm.value && isDetailCreator.value && !isDetailAssignee.value)
 )
@@ -414,13 +414,13 @@ function fileName(url) {
           <p class="picker-hint">Они увидят задачу, смогут комментировать и прикреплять файлы, но не менять её статус.</p>
           <div class="participant-picker">
             <label
-              v-for="u in employees.filter((item) => item.id !== form.assignee)"
+              v-for="u in participantCandidates.filter((item) => item.id !== form.assignee)"
               :key="u.id"
               class="participant-option"
             >
-              <input v-model="form.participants" type="checkbox" :value="u.id" />
+              <input v-model="form.participants" class="participant-check" type="checkbox" :value="u.id" />
               <UserAvatar :user="u" :size="24" />
-              <span>{{ u.full_name }}</span>
+              <span>{{ u.full_name }}<small>{{ u.role === 'admin' ? 'Администратор' : u.role === 'pm' ? 'PM' : 'Сотрудник' }}</small></span>
             </label>
           </div>
         </div>
@@ -508,13 +508,13 @@ function fileName(url) {
             <p class="picker-hint">Получают уведомление и доступ к комментариям и файлам.</p>
             <div class="participant-picker">
               <label
-                v-for="u in employees.filter((item) => item.id !== detailEdit.assignee)"
+                v-for="u in participantCandidates.filter((item) => item.id !== detailEdit.assignee)"
                 :key="u.id"
                 class="participant-option"
               >
-                <input v-model="detailEdit.participants" type="checkbox" :value="u.id" />
+                <input v-model="detailEdit.participants" class="participant-check" type="checkbox" :value="u.id" />
                 <UserAvatar :user="u" :size="24" />
-                <span>{{ u.full_name }}</span>
+                <span>{{ u.full_name }}<small>{{ u.role === 'admin' ? 'Администратор' : u.role === 'pm' ? 'PM' : 'Сотрудник' }}</small></span>
               </label>
             </div>
           </div>
@@ -668,7 +668,9 @@ function fileName(url) {
 .participant-picker { display: flex; flex-wrap: wrap; gap: 7px; }
 .participant-option { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-solid); font-size: .78rem; cursor: pointer; }
 .participant-option:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
-.participant-option input { width: 15px; height: 15px; accent-color: var(--accent); }
+.participant-check { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.participant-option > span, .participant-option small { display: block; }
+.participant-option small { margin-top: 1px; color: var(--muted); font-size: .62rem; font-weight: 550; }
 
 .detail h4 { font-size: 0.88rem; margin: 18px 0 8px; color: var(--ink-2); }
 .detail-relation { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
