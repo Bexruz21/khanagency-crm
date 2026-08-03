@@ -513,8 +513,7 @@ function fileName(url) {
                 class="participant-option"
               >
                 <input v-model="detailEdit.participants" class="participant-check" type="checkbox" :value="u.id" />
-                <UserAvatar :user="u" :size="24" />
-                <span>{{ u.full_name }}<small>{{ u.role === 'admin' ? 'Администратор' : u.role === 'pm' ? 'PM' : 'Сотрудник' }}</small></span>
+                <span>{{ u.full_name }}</span>
               </label>
             </div>
           </div>
