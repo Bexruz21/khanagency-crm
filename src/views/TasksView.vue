@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-import api, { downloadPdf } from '../api'
+import api, { downloadFile, downloadPdf } from '../api'
 import AppModal from '../components/AppModal.vue'
 import AppIcon from '../components/AppIcon.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -32,11 +32,16 @@ const columns = [
 // --- модалки ---
 const createModal = ref(false)
 const saving = ref(false)
-const blank = { title: '', description: '', brand: null, assignee: null, deadline: '', status: 'todo' }
+const blank = {
+  title: '', description: '', brand: null, assignee: null,
+  participants: [], deadline: '', status: 'todo',
+}
 const form = reactive({ ...blank })
 
 const detail = ref(null)       // подробная задача
-const detailEdit = reactive({ title: '', description: '', brand: null, assignee: null, deadline: '' })
+const detailEdit = reactive({
+  title: '', description: '', brand: null, assignee: null, participants: [], deadline: '',
+})
 const detailSaving = ref(false)
 const commentText = ref('')
 const fileInput = ref(null)
@@ -48,7 +53,9 @@ let detailSession = 0
 
 const isDetailAssignee = computed(() => detail.value?.assignee === auth.user?.id)
 const isDetailCreator = computed(() => detail.value?.creator === auth.user?.id)
-const usesAssigneeWorkflow = computed(() => isEmployee.value || (isPm.value && isDetailAssignee.value))
+const isDetailParticipant = computed(() => detail.value?.participants?.includes(auth.user?.id))
+const usesAssigneeWorkflow = computed(() => isDetailAssignee.value)
+const employees = computed(() => users.value.filter((user) => user.role === 'employee'))
 const canReviewDetail = computed(() =>
   isAdmin.value || (isPm.value && isDetailCreator.value && !isDetailAssignee.value)
 )
@@ -65,6 +72,7 @@ function fillDetailEdit(task) {
     description: task.description || '',
     brand: task.brand,
     assignee: task.assignee,
+    participants: [...(task.participants || [])],
     deadline: compactDateTime(task.deadline),
   })
 }
@@ -181,9 +189,14 @@ async function setDetailStatus(status) {
 async function createTask() {
   saving.value = true
   try {
-    await api.post('/tasks/', { ...form, deadline: form.deadline || null })
+    await api.post('/tasks/', {
+      ...form,
+      participants: form.participants.filter((id) => id !== form.assignee),
+      deadline: form.deadline || null,
+    })
     createModal.value = false
     Object.assign(form, blank)
+    form.participants = []
     await load()
   } finally {
     saving.value = false
@@ -226,6 +239,7 @@ async function saveDetailData() {
       description: detailEdit.description.trim(),
       brand: detailEdit.brand || null,
       assignee: detailEdit.assignee || null,
+      participants: detailEdit.participants.filter((id) => id !== detailEdit.assignee),
       deadline: detailEdit.deadline || null,
     })
     toasts.push('Изменения задачи сохранены.', 'success')
@@ -238,7 +252,9 @@ async function saveDetailData() {
 function closeDetail() {
   detailSession += 1
   detailOpeningId.value = null
-  Object.assign(detailEdit, { title: '', description: '', brand: null, assignee: null, deadline: '' })
+  Object.assign(detailEdit, {
+    title: '', description: '', brand: null, assignee: null, participants: [], deadline: '',
+  })
   detail.value = null
 }
 
@@ -269,6 +285,26 @@ async function uploadFile(e) {
   fd.append('file', file)
   await api.post(`/tasks/${detail.value.id}/attach/`, fd)
   e.target.value = ''
+  await refreshDetail()
+}
+
+async function downloadAttachment(attachment) {
+  await downloadFile(
+    `/tasks/${detail.value.id}/attachments/${attachment.id}/`,
+    fileName(attachment.file),
+  )
+}
+
+function canDeleteAttachment(attachment) {
+  if (!['todo', 'in_progress'].includes(detail.value?.status)) return false
+  return isAdmin.value
+    || isDetailCreator.value
+    || attachment.uploaded_by === auth.user?.id
+}
+
+async function deleteAttachment(attachment) {
+  await api.delete(`/tasks/${detail.value.id}/attachments/${attachment.id}/`)
+  toasts.push('Файл удалён.', 'success')
   await refreshDetail()
 }
 
@@ -335,6 +371,9 @@ function fileName(url) {
               <span v-if="pmTaskRelation(t)" class="relation-badge" :class="pmTaskRelation(t).key">
                 {{ pmTaskRelation(t).label }}
               </span>
+              <span v-if="t.participants?.includes(auth.user?.id)" class="relation-badge participant">
+                Вы причастны
+              </span>
               <span v-if="t.is_overdue" class="badge" style="background: var(--red-soft); color: var(--red)">просрочено</span>
             </div>
             <h4>{{ t.title }}</h4>
@@ -370,6 +409,21 @@ function fileName(url) {
             </select>
           </div>
         </div>
+        <div>
+          <label class="field">Причастные сотрудники</label>
+          <p class="picker-hint">Они увидят задачу, смогут комментировать и прикреплять файлы, но не менять её статус.</p>
+          <div class="participant-picker">
+            <label
+              v-for="u in employees.filter((item) => item.id !== form.assignee)"
+              :key="u.id"
+              class="participant-option"
+            >
+              <input v-model="form.participants" type="checkbox" :value="u.id" />
+              <UserAvatar :user="u" :size="24" />
+              <span>{{ u.full_name }}</span>
+            </label>
+          </div>
+        </div>
         <div class="row2">
           <div><label class="field">Дедлайн</label><input :value="form.deadline" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.deadline = maskCompactDateTime($event.target.value)" /></div>
           <div class="auto-priority-note"><span class="auto-mark">A</span><div><strong>Приоритет рассчитывается автоматически</strong><small>Он повышается по мере приближения дедлайна</small></div></div>
@@ -387,6 +441,10 @@ function fileName(url) {
         <div v-if="pmTaskRelation(detail)" class="detail-relation">
           <span class="relation-badge" :class="pmTaskRelation(detail).key">{{ pmTaskRelation(detail).label }}</span>
           <small>{{ pmTaskRelation(detail).key === 'created' ? 'Вы контролируете эту задачу' : 'Вы исполнитель этой задачи' }}</small>
+        </div>
+        <div v-if="isDetailParticipant" class="detail-relation">
+          <span class="relation-badge participant">Вы причастны</span>
+          <small>Можно комментировать и прикреплять файлы; статус меняет ответственный</small>
         </div>
 
         <!-- workflow: назначенный исполнитель ведёт задачу до проверки -->
@@ -445,6 +503,21 @@ function fileName(url) {
               <option v-for="u in users" :key="u.id" :value="u.id">{{ u.full_name }}</option>
             </select>
           </div>
+          <div class="span-2">
+            <label class="field">Причастные сотрудники</label>
+            <p class="picker-hint">Получают уведомление и доступ к комментариям и файлам.</p>
+            <div class="participant-picker">
+              <label
+                v-for="u in employees.filter((item) => item.id !== detailEdit.assignee)"
+                :key="u.id"
+                class="participant-option"
+              >
+                <input v-model="detailEdit.participants" type="checkbox" :value="u.id" />
+                <UserAvatar :user="u" :size="24" />
+                <span>{{ u.full_name }}</span>
+              </label>
+            </div>
+          </div>
           <div>
             <label class="field">Приоритет</label>
             <div class="auto-priority-value"><StatusBadge :map="PRIORITY" :value="detail.priority" /><span>Автоматически</span></div>
@@ -467,14 +540,31 @@ function fileName(url) {
           Статус: <strong>{{ TASK_STATUS[detail.status]?.label || detail.status }}</strong> ·
           Проект: <strong>{{ detail.brand_name || '—' }}</strong> ·
           Дедлайн: <strong :style="detail.is_overdue ? 'color: var(--red)' : ''">{{ fmtDate(detail.deadline, true) }}</strong> ·
+          Ответственный: <strong>{{ detail.assignee_detail?.full_name || '—' }}</strong> ·
           Создал: <strong>{{ detail.creator_detail?.full_name || '—' }}</strong>
         </p>
+        <div v-if="detail.participants_detail?.length" class="involved">
+          <span>Причастны:</span>
+          <span v-for="u in detail.participants_detail" :key="u.id" class="involved-person">
+            <UserAvatar :user="u" :size="22" /> {{ u.full_name }}
+          </span>
+        </div>
 
         <h4>Файлы</h4>
         <div class="files">
-          <a v-for="a in detail.attachments" :key="a.id" :href="a.file" target="_blank" class="file-chip">
-            <AppIcon name="paperclip" :size="16" /> {{ fileName(a.file) }}
-          </a>
+          <div v-for="a in detail.attachments" :key="a.id" class="file-item">
+            <button class="file-chip" @click="downloadAttachment(a)">
+              <AppIcon name="paperclip" :size="16" />
+              <span><strong>{{ fileName(a.file) }}</strong><small>{{ a.uploaded_by_detail?.full_name || 'Неизвестно' }}</small></span>
+            </button>
+            <button
+              v-if="canDeleteAttachment(a)"
+              class="file-delete"
+              title="Удалить файл"
+              aria-label="Удалить файл"
+              @click="deleteAttachment(a)"
+            ><AppIcon name="close" :size="14" /></button>
+          </div>
           <button class="btn outline sm" @click="fileInput.click()">+ Файл</button>
           <input ref="fileInput" type="file" hidden @change="uploadFile" />
         </div>
@@ -557,6 +647,7 @@ function fileName(url) {
 .relation-badge.assigned { background: var(--accent-soft); color: var(--accent); }
 .relation-badge.created { background: var(--amber-soft); color: var(--amber); }
 .relation-badge.self { background: var(--violet-soft); color: var(--violet); }
+.relation-badge.participant { background: var(--green-soft); color: var(--green); }
 .task h4 { font-size: 0.92rem; line-height: 1.3; }
 .proj { color: var(--muted); font-size: 0.78rem; }
 .task-bottom { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
@@ -573,6 +664,11 @@ function fileName(url) {
 .auto-mark { display: grid; width: 24px; height: 24px; flex: none; place-items: center; border-radius: 7px; background: var(--accent-soft); color: var(--accent); font-size: .7rem; font-weight: 800; }
 .auto-priority-value { display: flex; min-height: 40px; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--sunken); }
 .auto-priority-value > span { color: var(--muted); font-size: .7rem; font-weight: 650; }
+.picker-hint { margin: -1px 0 8px; color: var(--muted); font-size: .72rem; line-height: 1.4; }
+.participant-picker { display: flex; flex-wrap: wrap; gap: 7px; }
+.participant-option { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-solid); font-size: .78rem; cursor: pointer; }
+.participant-option:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+.participant-option input { width: 15px; height: 15px; accent-color: var(--accent); }
 
 .detail h4 { font-size: 0.88rem; margin: 18px 0 8px; color: var(--ink-2); }
 .detail-relation { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
@@ -599,17 +695,28 @@ function fileName(url) {
 .desc { margin-top: 14px; font-size: 0.92rem; white-space: pre-line; }
 .meta { color: var(--muted); font-size: 0.84rem; margin-top: 10px; }
 .meta strong { color: var(--ink-2); }
+.involved { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 10px; color: var(--muted); font-size: .78rem; }
+.involved-person { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 4px; border-radius: 99px; background: var(--sunken); color: var(--ink-2); font-weight: 600; }
 
 .files { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.file-item { display: inline-flex; align-items: stretch; overflow: hidden; border-radius: 12px; background: var(--accent-soft); }
 .file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
   background: var(--accent-soft);
   color: var(--accent-ink);
-  border-radius: 99px;
-  padding: 5px 12px;
+  border-radius: 0;
+  padding: 6px 10px;
   font-size: 0.82rem;
-  text-decoration: none;
+  text-align: left;
   font-weight: 600;
+  cursor: pointer;
 }
+.file-chip span, .file-chip small { display: block; }
+.file-chip small { margin-top: 1px; color: var(--muted); font-size: .66rem; font-weight: 500; }
+.file-delete { display: grid; width: 30px; place-items: center; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--red); cursor: pointer; }
 
 .comments { display: flex; flex-direction: column; gap: 10px; }
 .comment { display: flex; gap: 10px; }

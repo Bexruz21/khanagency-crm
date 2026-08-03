@@ -86,12 +86,20 @@ api.interceptors.response.use(
 
 export default api
 
-/** Скачивание PDF с авторизацией */
-export async function downloadPdf(url, filename) {
+/** Скачивание файла с авторизацией; blob работает стабильнее прямой media-ссылки в Safari. */
+export async function downloadFile(url, filename) {
   const { data } = await api.get(url, { responseType: 'blob' })
+  const objectUrl = URL.createObjectURL(data)
   const link = document.createElement('a')
-  link.href = URL.createObjectURL(data)
+  link.href = objectUrl
   link.download = filename
+  link.style.display = 'none'
+  document.body.appendChild(link)
   link.click()
-  URL.revokeObjectURL(link.href)
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+}
+
+export async function downloadPdf(url, filename) {
+  return downloadFile(url, filename)
 }
