@@ -7,7 +7,6 @@ function normalizeApiBase(value) {
 }
 
 // Vercel: задайте VITE_API_BASE_URL=https://<ваш-ngrok>.ngrok-free.app.
-// Без переменной используется same-origin /api (например, через vercel.json rewrite).
 export const API_BASE_URL = normalizeApiBase(
   import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL,
 )
