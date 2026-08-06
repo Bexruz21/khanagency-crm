@@ -43,6 +43,7 @@ const detailEdit = reactive({
   title: '', description: '', brand: null, assignee: null, participants: [], deadline: '',
 })
 const detailSaving = ref(false)
+const statusSaving = ref(false)
 const commentText = ref('')
 const fileInput = ref(null)
 const detailOpeningId = ref(null)
@@ -50,6 +51,7 @@ let unsubscribeRealtime = null
 let syncInFlight = false
 let suppressCardClick = false
 let detailSession = 0
+let optimisticId = 0
 
 const isDetailAssignee = computed(() => detail.value?.assignee === auth.user?.id)
 const isDetailCreator = computed(() => detail.value?.creator === auth.user?.id)
@@ -75,6 +77,72 @@ function fillDetailEdit(task) {
     participants: [...(task.participants || [])],
     deadline: compactDateTime(task.deadline),
   })
+}
+
+function cloneTask(task) {
+  return task ? JSON.parse(JSON.stringify(task)) : task
+}
+
+function nextOptimisticId(kind) {
+  optimisticId += 1
+  return `optimistic-${kind}-${Date.now()}-${optimisticId}`
+}
+
+function userById(id) {
+  return users.value.find((user) => user.id === id) || null
+}
+
+function brandById(id) {
+  return brands.value.find((brand) => brand.id === id) || null
+}
+
+function localDeadline(value) {
+  if (!value || !/^\d{1,2}\.\d{1,2}(?:\s+\d{1,2}:\d{2})?$/.test(value)) return value || null
+  const [datePart, timePart = '18:00'] = value.trim().split(/\s+/)
+  const [day, month] = datePart.split('.').map(Number)
+  const [hour, minute] = timePart.split(':').map(Number)
+  const now = new Date()
+  const candidate = new Date(now.getFullYear(), month - 1, day, hour, minute)
+  const sixMonthsAgo = new Date(now)
+  sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 183)
+  if (candidate < sixMonthsAgo) candidate.setFullYear(candidate.getFullYear() + 1)
+  return Number.isNaN(candidate.getTime()) ? value : candidate.toISOString()
+}
+
+function replaceTaskInBoard(taskId, replacement) {
+  const index = (tasks.value || []).findIndex((task) => task.id === taskId)
+  if (index !== -1) tasks.value.splice(index, 1, replacement)
+}
+
+function removeTaskFromBoard(taskId) {
+  const index = (tasks.value || []).findIndex((task) => task.id === taskId)
+  if (index !== -1) tasks.value.splice(index, 1)
+  return index
+}
+
+function pendingForCurrentUser(task) {
+  return task?.assignee === auth.user?.id && task?.status === 'todo'
+}
+
+function adjustPendingCount(previous, next) {
+  const delta = Number(pendingForCurrentUser(next)) - Number(pendingForCurrentUser(previous))
+  if (delta) window.dispatchEvent(new CustomEvent('task-pending-delta', { detail: delta }))
+}
+
+function mutationError(action, error) {
+  const message = error?.response?.data?.detail
+  toasts.push(message || `${action}. Изменение отменено.`, 'danger')
+}
+
+function optimisticTaskFields(fields) {
+  const next = { ...fields }
+  if (Object.hasOwn(fields, 'deadline')) next.deadline = localDeadline(fields.deadline)
+  if (Object.hasOwn(fields, 'assignee')) next.assignee_detail = userById(fields.assignee)
+  if (Object.hasOwn(fields, 'brand')) next.brand_name = brandById(fields.brand)?.name || ''
+  if (Object.hasOwn(fields, 'participants')) {
+    next.participants_detail = fields.participants.map(userById).filter(Boolean)
+  }
+  return next
 }
 
 function pmTaskRelation(task) {
@@ -153,18 +221,20 @@ function isToday(value) {
 const dragId = ref(null)
 const dragOver = ref('')
 async function onDrop(status) {
-  // Свободное перемещение по колонкам доступно только администратору.
   if (!isAdmin.value) return
   const task = tasks.value.find((t) => t.id === dragId.value)
   dragOver.value = ''
   if (!task || task.status === 'done' || task.status === status) return
-  const prev = task.status
-  task.status = status // оптимистично — интерфейс отвечает мгновенно
+  const previous = cloneTask(task)
+  task.status = status
+  adjustPendingCount(previous, task)
   try {
-    await api.patch(`/tasks/${task.id}/`, { status })
-    await load()
-  } catch {
-    task.status = prev
+    const { data } = await api.patch(`/tasks/${task.id}/`, { status })
+    replaceTaskInBoard(task.id, data)
+  } catch (error) {
+    replaceTaskInBoard(previous.id, previous)
+    adjustPendingCount(task, previous)
+    mutationError('Не удалось изменить статус задачи', error)
   } finally {
     dragId.value = null
   }
@@ -187,17 +257,45 @@ async function setDetailStatus(status) {
 }
 
 async function createTask() {
+  if (saving.value || !form.title.trim()) return
+  const formSnapshot = cloneTask(form)
+  const payload = {
+    ...formSnapshot,
+    title: formSnapshot.title.trim(),
+    participants: formSnapshot.participants.filter((id) => id !== formSnapshot.assignee),
+    deadline: formSnapshot.deadline || null,
+  }
+  const temporaryTask = {
+    id: nextOptimisticId('task'),
+    ...optimisticTaskFields(payload),
+    creator: auth.user?.id,
+    creator_detail: auth.user,
+    priority: 'medium',
+    priority_mode: 'auto',
+    status: payload.status || 'todo',
+    created_at: new Date().toISOString(),
+    comments_count: 0,
+    is_overdue: false,
+    _pending: true,
+  }
+
   saving.value = true
+  if (!tasks.value) tasks.value = []
+  tasks.value.unshift(temporaryTask)
+  adjustPendingCount(null, temporaryTask)
+  createModal.value = false
+  Object.assign(form, blank)
+  form.participants = []
   try {
-    await api.post('/tasks/', {
-      ...form,
-      participants: form.participants.filter((id) => id !== form.assignee),
-      deadline: form.deadline || null,
-    })
-    createModal.value = false
-    Object.assign(form, blank)
-    form.participants = []
-    await load()
+    const { data } = await api.post('/tasks/', payload)
+    replaceTaskInBoard(temporaryTask.id, data)
+  } catch (error) {
+    removeTaskFromBoard(temporaryTask.id)
+    adjustPendingCount(temporaryTask, null)
+    Object.assign(form, formSnapshot)
+    form.participants = [...formSnapshot.participants]
+    createModal.value = true
+    mutationError('Не удалось создать задачу', error)
   } finally {
     saving.value = false
   }
@@ -219,31 +317,35 @@ async function openDetail(task) {
   }
 }
 
-async function refreshDetail() {
-  const taskId = detail.value?.id
-  if (!taskId) return
-  const session = detailSession
-  const { data } = await api.get(`/tasks/${taskId}/`)
-  if (detailSession !== session || detail.value?.id !== taskId) return
-  detail.value = data
-  fillDetailEdit(data)
-  await load()
-}
-
 async function saveDetailData() {
   if (!detail.value || detailSaving.value || !detailEdit.title.trim()) return
+  const previous = cloneTask(detail.value)
+  const payload = {
+    title: detailEdit.title.trim(),
+    description: detailEdit.description.trim(),
+    brand: detailEdit.brand || null,
+    assignee: detailEdit.assignee || null,
+    participants: detailEdit.participants.filter((id) => id !== detailEdit.assignee),
+    deadline: detailEdit.deadline || null,
+  }
+  const optimistic = { ...detail.value, ...optimisticTaskFields(payload) }
+  detail.value = optimistic
+  replaceTaskInBoard(previous.id, { ...previous, ...optimisticTaskFields(payload) })
+  adjustPendingCount(previous, optimistic)
   detailSaving.value = true
   try {
-    await api.patch(`/tasks/${detail.value.id}/`, {
-      title: detailEdit.title.trim(),
-      description: detailEdit.description.trim(),
-      brand: detailEdit.brand || null,
-      assignee: detailEdit.assignee || null,
-      participants: detailEdit.participants.filter((id) => id !== detailEdit.assignee),
-      deadline: detailEdit.deadline || null,
-    })
+    const { data } = await api.patch(`/tasks/${previous.id}/`, payload)
+    if (detail.value?.id === previous.id) {
+      detail.value = { ...detail.value, ...data }
+      fillDetailEdit(detail.value)
+    }
+    replaceTaskInBoard(previous.id, data)
     toasts.push('Изменения задачи сохранены.', 'success')
-    await refreshDetail()
+  } catch (error) {
+    if (detail.value?.id === previous.id) detail.value = previous
+    replaceTaskInBoard(previous.id, previous)
+    adjustPendingCount(optimistic, previous)
+    mutationError('Не удалось сохранить задачу', error)
   } finally {
     detailSaving.value = false
   }
@@ -259,36 +361,105 @@ function closeDetail() {
 }
 
 async function patchDetail(fields) {
-  await api.patch(`/tasks/${detail.value.id}/`, fields)
-  await refreshDetail()
+  if (!detail.value || statusSaving.value) return
+  const previous = cloneTask(detail.value)
+  const optimistic = { ...detail.value, ...optimisticTaskFields(fields) }
+  detail.value = optimistic
+  replaceTaskInBoard(previous.id, { ...previous, ...optimisticTaskFields(fields) })
+  adjustPendingCount(previous, optimistic)
+  statusSaving.value = true
+  try {
+    const { data } = await api.patch(`/tasks/${previous.id}/`, fields)
+    if (detail.value?.id === previous.id) detail.value = { ...detail.value, ...data }
+    replaceTaskInBoard(previous.id, data)
+  } catch (error) {
+    if (detail.value?.id === previous.id) detail.value = previous
+    replaceTaskInBoard(previous.id, previous)
+    adjustPendingCount(optimistic, previous)
+    mutationError('Не удалось изменить задачу', error)
+  } finally {
+    statusSaving.value = false
+  }
 }
 
 async function archiveDetail() {
   if (!detail.value || detail.value.status !== 'done') return
-  await api.post(`/tasks/${detail.value.id}/archive/`)
-  toasts.push('Задача отправлена в архив.', 'success')
+  const previous = cloneTask(detail.value)
+  const previousIndex = removeTaskFromBoard(previous.id)
   closeDetail()
-  await load()
+  try {
+    await api.post(`/tasks/${previous.id}/archive/`)
+    toasts.push('Задача отправлена в архив.', 'success')
+  } catch (error) {
+    tasks.value.splice(Math.max(previousIndex, 0), 0, previous)
+    detail.value = previous
+    fillDetailEdit(previous)
+    mutationError('Не удалось отправить задачу в архив', error)
+  }
 }
 
 async function addComment() {
-  if (!commentText.value.trim()) return
-  await api.post(`/tasks/${detail.value.id}/comment/`, { text: commentText.value })
+  const text = commentText.value.trim()
+  if (!text || !detail.value) return
+  const taskId = detail.value.id
+  const temporaryComment = {
+    id: nextOptimisticId('comment'),
+    task: taskId,
+    author: auth.user?.id,
+    author_detail: auth.user,
+    text,
+    created_at: new Date().toISOString(),
+    _pending: true,
+  }
+  detail.value.comments = [...(detail.value.comments || []), temporaryComment]
+  detail.value.comments_count = (detail.value.comments_count || 0) + 1
+  const boardTask = (tasks.value || []).find((task) => task.id === taskId)
+  if (boardTask) boardTask.comments_count = (boardTask.comments_count || 0) + 1
   commentText.value = ''
-  await refreshDetail()
+  try {
+    const { data } = await api.post(`/tasks/${taskId}/comment/`, { text })
+    const index = detail.value?.comments?.findIndex((comment) => comment.id === temporaryComment.id) ?? -1
+    if (index !== -1) detail.value.comments.splice(index, 1, data)
+  } catch (error) {
+    const index = detail.value?.comments?.findIndex((comment) => comment.id === temporaryComment.id) ?? -1
+    if (index !== -1) detail.value.comments.splice(index, 1)
+    if (detail.value?.id === taskId) detail.value.comments_count = Math.max(0, detail.value.comments_count - 1)
+    if (boardTask) boardTask.comments_count = Math.max(0, boardTask.comments_count - 1)
+    commentText.value = text
+    mutationError('Не удалось отправить комментарий', error)
+  }
 }
 
 async function uploadFile(e) {
   const file = e.target.files[0]
-  if (!file) return
+  if (!file || !detail.value) return
+  const taskId = detail.value.id
+  const temporaryAttachment = {
+    id: nextOptimisticId('file'),
+    task: taskId,
+    file: file.name,
+    uploaded_by: auth.user?.id,
+    uploaded_by_detail: auth.user,
+    uploaded_at: new Date().toISOString(),
+    _pending: true,
+  }
+  detail.value.attachments = [...(detail.value.attachments || []), temporaryAttachment]
+  e.target.value = ''
   const fd = new FormData()
   fd.append('file', file)
-  await api.post(`/tasks/${detail.value.id}/attach/`, fd)
-  e.target.value = ''
-  await refreshDetail()
+  try {
+    const { data } = await api.post(`/tasks/${taskId}/attach/`, fd)
+    const index = detail.value?.attachments?.findIndex((item) => item.id === temporaryAttachment.id) ?? -1
+    if (index !== -1) detail.value.attachments.splice(index, 1, data)
+  } catch (error) {
+    const index = detail.value?.attachments?.findIndex((item) => item.id === temporaryAttachment.id) ?? -1
+    if (index !== -1) detail.value.attachments.splice(index, 1)
+    mutationError('Не удалось прикрепить файл', error)
+  }
 }
 
 async function downloadAttachment(attachment) {
+  if (attachment._pending) return
   await downloadFile(
     `/tasks/${detail.value.id}/attachments/${attachment.id}/`,
     fileName(attachment.file),
@@ -296,6 +467,7 @@ async function downloadAttachment(attachment) {
 }
 
 function canDeleteAttachment(attachment) {
+  if (attachment._pending) return false
   if (!['todo', 'in_progress'].includes(detail.value?.status)) return false
   return isAdmin.value
     || isDetailCreator.value
@@ -303,15 +475,34 @@ function canDeleteAttachment(attachment) {
 }
 
 async function deleteAttachment(attachment) {
-  await api.delete(`/tasks/${detail.value.id}/attachments/${attachment.id}/`)
-  toasts.push('Файл удалён.', 'success')
-  await refreshDetail()
+  const taskId = detail.value.id
+  const index = detail.value.attachments.findIndex((item) => item.id === attachment.id)
+  if (index === -1) return
+  detail.value.attachments.splice(index, 1)
+  try {
+    await api.delete(`/tasks/${taskId}/attachments/${attachment.id}/`)
+    toasts.push('Файл удалён.', 'success')
+  } catch (error) {
+    if (detail.value?.id === taskId) detail.value.attachments.splice(index, 0, attachment)
+    mutationError('Не удалось удалить файл', error)
+  }
 }
 
 async function removeTask() {
-  await api.delete(`/tasks/${detail.value.id}/`)
+  if (!detail.value) return
+  const previous = cloneTask(detail.value)
+  const previousIndex = removeTaskFromBoard(previous.id)
+  adjustPendingCount(previous, null)
   closeDetail()
-  await load()
+  try {
+    await api.delete(`/tasks/${previous.id}/`)
+  } catch (error) {
+    tasks.value.splice(Math.max(previousIndex, 0), 0, previous)
+    adjustPendingCount(null, previous)
+    detail.value = previous
+    fillDetailEdit(previous)
+    mutationError('Не удалось удалить задачу', error)
+  }
 }
 
 function fileName(url) {
@@ -360,11 +551,11 @@ function fileName(url) {
           <article
             v-for="t in byColumn[col.id]" :key="t.id"
             class="card task flip-move"
-            :class="{ locked: !isAdmin }"
-            :draggable="isAdmin && t.status !== 'done'"
+            :class="{ locked: !isAdmin, pending: t._pending }"
+            :draggable="isAdmin && !t._pending && t.status !== 'done'"
             @dragstart="onDragStart(t.id)"
             @dragend="onDragEnd"
-            @click="openDetail(t)"
+            @click="!t._pending && openDetail(t)"
           >
             <div class="task-top">
               <StatusBadge v-if="t.status !== 'done'" :map="PRIORITY" :value="t.priority" />
@@ -552,9 +743,12 @@ function fileName(url) {
         <h4>Файлы</h4>
         <div class="files">
           <div v-for="a in detail.attachments" :key="a.id" class="file-item">
-            <button class="file-chip" @click="downloadAttachment(a)">
+            <button class="file-chip" :class="{ pending: a._pending }" :disabled="a._pending" @click="downloadAttachment(a)">
               <AppIcon name="paperclip" :size="16" />
-              <span><strong>{{ fileName(a.file) }}</strong><small>{{ a.uploaded_by_detail?.full_name || 'Неизвестно' }}</small></span>
+              <span>
+                <strong>{{ fileName(a.file) }}</strong>
+                <small>{{ a._pending ? 'Загружается…' : (a.uploaded_by_detail?.full_name || 'Неизвестно') }}</small>
+              </span>
             </button>
             <button
               v-if="canDeleteAttachment(a)"
@@ -570,7 +764,7 @@ function fileName(url) {
 
         <h4>Комментарии</h4>
         <div class="comments">
-          <div v-for="c in detail.comments" :key="c.id" class="comment">
+          <div v-for="c in detail.comments" :key="c.id" class="comment" :class="{ pending: c._pending }">
             <UserAvatar :user="c.author_detail" :size="26" />
             <div>
               <div class="c-head"><strong>{{ c.author_detail?.full_name }}</strong><span>{{ fmtDate(c.created_at, true) }}</span></div>
@@ -717,6 +911,8 @@ function fileName(url) {
 }
 .file-chip span, .file-chip small { display: block; }
 .file-chip small { margin-top: 1px; color: var(--muted); font-size: .66rem; font-weight: 500; }
+.task.pending, .file-chip.pending, .comment.pending { opacity: .62; }
+.file-chip.pending { cursor: wait; }
 .file-delete { display: grid; width: 30px; place-items: center; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--red); cursor: pointer; }
 
 .comments { display: flex; flex-direction: column; gap: 10px; }

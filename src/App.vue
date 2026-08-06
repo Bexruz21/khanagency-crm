@@ -22,6 +22,27 @@ const presence = usePresenceStore()
 const isLogin = computed(() => route.name === 'login')
 
 const collapsed = ref(localStorage.getItem('khan_sidebar') === '1')
+const pendingTaskCount = ref(0)
+let pendingTaskCountLoading = false
+
+function handlePendingTaskDelta(event) {
+  pendingTaskCount.value = Math.max(0, pendingTaskCount.value + (Number(event.detail) || 0))
+}
+
+async function loadPendingTaskCount() {
+  if (!auth.user || !auth.isAuthed || pendingTaskCountLoading) return
+  const userId = auth.user.id
+  pendingTaskCountLoading = true
+  try {
+    const { data } = await api.get('/tasks/pending-count/')
+    if (auth.user?.id === userId) pendingTaskCount.value = Number(data.count) || 0
+  } catch {
+    /* При следующем WebSocket ready/data.changed счётчик обновится снова. */
+  } finally {
+    pendingTaskCountLoading = false
+  }
+}
+
 function toggleSidebar() {
   collapsed.value = !collapsed.value
   localStorage.setItem('khan_sidebar', collapsed.value ? '1' : '0')
@@ -64,7 +85,10 @@ async function pollNotifications() {
 // App не перемонтируется после login. Ждём одновременно пользователя и завершение перехода
 // с /login, чтобы toast появился уже поверх рабочего интерфейса.
 watch([() => auth.user?.id, () => route.name], ([userId, routeName]) => {
-  if (userId && routeName !== 'login') pollNotifications()
+  if (userId && routeName !== 'login') {
+    pollNotifications()
+    loadPendingTaskCount()
+  }
 })
 
 async function handleRealtime(event) {
@@ -85,7 +109,11 @@ async function handleRealtime(event) {
     return
   }
   if (event.type === 'ready') {
-    await pollNotifications()
+    await Promise.all([pollNotifications(), loadPendingTaskCount()])
+    return
+  }
+  if (event.type === 'data.changed' && event.resource === 'tasks') {
+    await loadPendingTaskCount()
     return
   }
   if (event.type !== 'notification.created') return
@@ -101,19 +129,26 @@ async function handleRealtime(event) {
 
 onMounted(() => {
   pollNotifications()
+  loadPendingTaskCount()
+  window.addEventListener('task-pending-delta', handlePendingTaskDelta)
   unsubscribeRealtime = subscribeRealtimeEvents(handleRealtime)
   if (auth.isAuthed) startRealtime()
 })
 onUnmounted(() => {
+  window.removeEventListener('task-pending-delta', handlePendingTaskDelta)
   unsubscribeRealtime?.()
   stopRealtime()
 })
 
 watch(() => auth.isAuthed, (isAuthed) => {
-  if (isAuthed) startRealtime()
+  if (isAuthed) {
+    startRealtime()
+    loadPendingTaskCount()
+  }
   else {
     stopRealtime()
     presence.reset()
+    pendingTaskCount.value = 0
   }
 })
 
@@ -178,10 +213,13 @@ function isActive(item) {
           v-for="item in nav" :key="item.to" :to="item.to"
           class="nav-item" :class="{ active: isActive(item) }"
           :title="collapsed ? item.label : ''"
-          :aria-label="item.label"
+          :aria-label="item.to === '/tasks' && pendingTaskCount ? `${item.label}: ${pendingTaskCount}` : item.label"
         >
           <svg viewBox="0 0 24 24" width="19" height="19"><path :d="item.icon" fill="currentColor" /></svg>
           <span class="label">{{ item.label }}</span>
+          <span v-if="item.to === '/tasks' && pendingTaskCount" class="nav-count">
+            {{ Math.min(99, pendingTaskCount) }}
+          </span>
         </RouterLink>
       </nav>
 
@@ -286,6 +324,7 @@ function isActive(item) {
 nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 
 .nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 11px;
@@ -297,6 +336,32 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
   font-size: 0.93rem;
   transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease,
               transform var(--dur-press) var(--ease-out);
+}
+.nav-count {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding-inline: 5px;
+  place-items: center;
+  border-radius: 99px;
+  background: #ff453a;
+  color: #fff;
+  font-size: 0.67rem;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 7px rgb(0 0 0 / 0.22);
+}
+.nav-item.active .nav-count { background: #fff; color: #0a84ff; }
+.collapsed .nav-count {
+  position: absolute;
+  top: 3px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 4px;
+  font-size: 0.61rem;
 }
 .collapsed .nav-item { justify-content: center; gap: 0; padding: 11px 0; width: 46px; margin-inline: auto; }
 .nav-item svg { flex: none; }
@@ -401,6 +466,17 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
   }
   .nav-item svg { width: 23px; height: 23px; }
   .nav-item .label, .collapsed .nav-item .label { display: none; }
+  .nav-count,
+  .collapsed .nav-count {
+    position: absolute;
+    top: 3px;
+    right: max(2px, calc(50% - 22px));
+    min-width: 18px;
+    height: 18px;
+    margin: 0;
+    padding-inline: 4px;
+    font-size: 0.6rem;
+  }
   .sidebar-user,
   .collapsed .sidebar-user {
     display: none;
