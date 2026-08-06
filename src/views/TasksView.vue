@@ -257,7 +257,7 @@ async function setDetailStatus(status) {
 }
 
 async function createTask() {
-  if (saving.value || !form.title.trim()) return
+  if (saving.value || !form.title.trim() || !form.assignee) return
   const formSnapshot = cloneTask(form)
   const payload = {
     ...formSnapshot,
@@ -593,9 +593,9 @@ function fileName(url) {
             </select>
           </div>
           <div>
-            <label class="field">Исполнитель</label>
-            <select v-model="form.assignee" class="select">
-              <option :value="null">—</option>
+            <label class="field">Ответственный *</label>
+            <select v-model="form.assignee" class="select" required>
+              <option :value="null" disabled>Выберите ответственного</option>
               <option v-for="u in users" :key="u.id" :value="u.id">{{ u.full_name }}</option>
             </select>
           </div>
@@ -610,8 +610,7 @@ function fileName(url) {
               class="participant-option"
             >
               <input v-model="form.participants" class="participant-check" type="checkbox" :value="u.id" />
-              <UserAvatar :user="u" :size="24" />
-              <span>{{ u.full_name }}<small>{{ u.role === 'admin' ? 'Администратор' : u.role === 'pm' ? 'PM' : 'Сотрудник' }}</small></span>
+              <span>{{ u.full_name }}</span>
             </label>
           </div>
         </div>
@@ -622,7 +621,7 @@ function fileName(url) {
       </div>
       <template #footer>
         <button class="btn outline" @click="createModal = false">Отмена</button>
-        <button class="btn" :disabled="saving || !form.title" @click="createTask">Создать</button>
+        <button class="btn" :disabled="saving || !form.title.trim() || !form.assignee" @click="createTask">Создать</button>
       </template>
     </AppModal>
 

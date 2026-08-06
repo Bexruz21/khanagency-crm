@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from './api'
 import { useAuthStore } from './stores/auth'
 import { useToastStore } from './stores/toasts'
@@ -16,6 +16,7 @@ import UserAvatar from './components/UserAvatar.vue'
 import { ROLE } from './labels'
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const toasts = useToastStore()
 const presence = usePresenceStore()
@@ -24,6 +25,17 @@ const isLogin = computed(() => route.name === 'login')
 const collapsed = ref(localStorage.getItem('khan_sidebar') === '1')
 const pendingTaskCount = ref(0)
 let pendingTaskCountLoading = false
+const browserNotificationsSupported = 'Notification' in window
+const browserNotificationPermission = ref(
+  browserNotificationsSupported ? Notification.permission : 'unsupported',
+)
+const notificationPromptDismissed = ref(false)
+const showNotificationPermissionPrompt = computed(() =>
+  auth.user
+  && browserNotificationsSupported
+  && browserNotificationPermission.value === 'default'
+  && !notificationPromptDismissed.value
+)
 
 function handlePendingTaskDelta(event) {
   pendingTaskCount.value = Math.max(0, pendingTaskCount.value + (Number(event.detail) || 0))
@@ -48,6 +60,41 @@ function toggleSidebar() {
   localStorage.setItem('khan_sidebar', collapsed.value ? '1' : '0')
 }
 
+async function enableBrowserNotifications() {
+  if (!browserNotificationsSupported) return
+  try {
+    browserNotificationPermission.value = await Notification.requestPermission()
+    if (browserNotificationPermission.value === 'granted') {
+      toasts.push('Уведомления браузера включены.', 'success')
+    } else {
+      toasts.push('Браузер не разрешил уведомления. Разрешение можно изменить в настройках сайта.', 'warning')
+    }
+  } catch {
+    toasts.push('Не удалось запросить разрешение на уведомления.', 'danger')
+  }
+}
+
+function dismissNotificationPrompt() {
+  notificationPromptDismissed.value = true
+}
+
+function showBrowserNotification(notification) {
+  if (!browserNotificationsSupported || Notification.permission !== 'granted' || !document.hidden) return
+  try {
+    const browserNotification = new Notification('KHAN CRM', {
+      body: notification.text,
+      tag: `khan-crm-${notification.id}`,
+    })
+    browserNotification.onclick = () => {
+      window.focus()
+      if (notification.link) router.push(notification.link)
+      browserNotification.close()
+    }
+  } catch {
+    /* Некоторые мобильные браузеры объявляют API, но разрешают уведомления только установленному PWA. */
+  }
+}
+
 /* ---- WebSocket-уведомления + одноразовая загрузка пропущенных ---- */
 let notificationsLoading = false
 let unsubscribeRealtime = null
@@ -59,6 +106,7 @@ function showNotification(notification) {
   if (deliveredNotificationIds.size > 500) {
     deliveredNotificationIds.delete(deliveredNotificationIds.values().next().value)
   }
+  showBrowserNotification(notification)
   toasts.push(notification.text, notification.kind, notification.link)
 }
 
@@ -196,6 +244,17 @@ function isActive(item) {
   </div>
 
   <div v-else-if="auth.initialized && auth.user" class="shell">
+    <Transition name="permission">
+      <div v-if="showNotificationPermissionPrompt" class="notification-permission">
+        <div>
+          <strong>Включить уведомления?</strong>
+          <span>Новые задачи и сообщения будут видны, даже когда вкладка в фоне.</span>
+        </div>
+        <button class="permission-enable" @click="enableBrowserNotifications">Включить</button>
+        <button class="permission-close" aria-label="Закрыть" @click="dismissNotificationPrompt">×</button>
+      </div>
+    </Transition>
+
     <aside class="sidebar" :class="{ collapsed }">
       <div class="top-row">
         <RouterLink to="/" class="logo">
@@ -249,6 +308,59 @@ function isActive(item) {
 
 <style scoped>
 .login-shell { height: 100%; }
+
+.notification-permission {
+  position: fixed;
+  z-index: 190;
+  top: 18px;
+  left: 50%;
+  width: min(520px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 12px 16px;
+  border: 0.5px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-raised);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: var(--shadow-lg);
+}
+.notification-permission div { flex: 1; min-width: 0; }
+.notification-permission strong,
+.notification-permission span { display: block; }
+.notification-permission strong { font-size: .9rem; }
+.notification-permission span { margin-top: 2px; color: var(--muted); font-size: .76rem; line-height: 1.3; }
+.permission-enable {
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 13px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.permission-close {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--sunken);
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.permission-enter-active, .permission-leave-active {
+  transition: opacity 180ms var(--ease-out), transform 220ms var(--ease-drawer);
+}
+.permission-enter-from, .permission-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -12px) scale(.98);
+}
 
 /* floating-раскладка: sidebar не прилипает к краю, парит с отступом */
 .shell {
@@ -425,6 +537,10 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 }
 
 @media (max-width: 760px) {
+  .notification-permission {
+    top: calc(10px + env(safe-area-inset-top));
+    align-items: flex-start;
+  }
   .shell { display: block; height: 100%; padding: 0; }
   .content {
     height: 100%;
