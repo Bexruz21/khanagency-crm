@@ -29,7 +29,9 @@ const browserNotificationsSupported = 'Notification' in window
 const browserNotificationPermission = ref(
   browserNotificationsSupported ? Notification.permission : 'unsupported',
 )
-const notificationPromptDismissed = ref(false)
+const notificationPromptDismissed = ref(
+  localStorage.getItem('khan_notification_prompt_handled') === '1',
+)
 let notificationWorkerPromise = null
 const showNotificationPermissionPrompt = computed(() =>
   auth.user
@@ -76,6 +78,8 @@ async function enableBrowserNotifications() {
   try {
     browserNotificationPermission.value = await Notification.requestPermission()
     if (browserNotificationPermission.value === 'granted') {
+      localStorage.setItem('khan_notification_prompt_handled', '1')
+      notificationPromptDismissed.value = true
       toasts.push('Уведомления браузера включены.', 'success')
       await registerNotificationWorker()
     } else {
@@ -88,6 +92,7 @@ async function enableBrowserNotifications() {
 
 function dismissNotificationPrompt() {
   notificationPromptDismissed.value = true
+  localStorage.setItem('khan_notification_prompt_handled', '1')
 }
 
 async function showBrowserNotification(notification, force = false) {
