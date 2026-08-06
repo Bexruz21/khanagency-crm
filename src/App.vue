@@ -30,6 +30,7 @@ const browserNotificationPermission = ref(
   browserNotificationsSupported ? Notification.permission : 'unsupported',
 )
 const notificationPromptDismissed = ref(false)
+let notificationWorkerPromise = null
 const showNotificationPermissionPrompt = computed(() =>
   auth.user
   && browserNotificationsSupported
@@ -60,12 +61,28 @@ function toggleSidebar() {
   localStorage.setItem('khan_sidebar', collapsed.value ? '1' : '0')
 }
 
+function registerNotificationWorker() {
+  if (!('serviceWorker' in navigator)) return Promise.resolve(null)
+  if (!notificationWorkerPromise) {
+    notificationWorkerPromise = navigator.serviceWorker
+      .register('/notification-sw.js', { updateViaCache: 'none' })
+      .catch(() => null)
+  }
+  return notificationWorkerPromise
+}
+
 async function enableBrowserNotifications() {
   if (!browserNotificationsSupported) return
   try {
     browserNotificationPermission.value = await Notification.requestPermission()
     if (browserNotificationPermission.value === 'granted') {
       toasts.push('Уведомления браузера включены.', 'success')
+      await registerNotificationWorker()
+      await showBrowserNotification({
+        id: 'permission-test',
+        text: 'Проверка завершена — уведомления KHAN CRM работают.',
+        link: '/tasks',
+      }, true)
     } else {
       toasts.push('Браузер не разрешил уведомления. Разрешение можно изменить в настройках сайта.', 'warning')
     }
@@ -78,9 +95,23 @@ function dismissNotificationPrompt() {
   notificationPromptDismissed.value = true
 }
 
-function showBrowserNotification(notification) {
-  if (!browserNotificationsSupported || Notification.permission !== 'granted' || !document.hidden) return
+async function showBrowserNotification(notification, force = false) {
+  if (
+    !browserNotificationsSupported
+    || Notification.permission !== 'granted'
+    || (!force && !document.hidden)
+  ) return false
   try {
+    const registration = await registerNotificationWorker()
+    if (registration) {
+      await registration.showNotification('KHAN CRM', {
+        body: notification.text,
+        tag: `khan-crm-${notification.id}`,
+        data: { link: notification.link || '/' },
+      })
+      return true
+    }
+
     const browserNotification = new Notification('KHAN CRM', {
       body: notification.text,
       tag: `khan-crm-${notification.id}`,
@@ -90,8 +121,10 @@ function showBrowserNotification(notification) {
       if (notification.link) router.push(notification.link)
       browserNotification.close()
     }
+    return true
   } catch {
     /* Некоторые мобильные браузеры объявляют API, но разрешают уведомления только установленному PWA. */
+    return false
   }
 }
 
@@ -178,6 +211,18 @@ async function handleRealtime(event) {
 onMounted(() => {
   pollNotifications()
   loadPendingTaskCount()
+  if (browserNotificationPermission.value === 'granted') {
+    registerNotificationWorker().then(async (registration) => {
+      const testKey = 'khan_notification_worker_test_v1'
+      if (!registration || localStorage.getItem(testKey) === '1') return
+      const shown = await showBrowserNotification({
+        id: 'worker-test',
+        text: 'Системные уведомления KHAN CRM подключены.',
+        link: '/tasks',
+      }, true)
+      if (shown) localStorage.setItem(testKey, '1')
+    })
+  }
   window.addEventListener('task-pending-delta', handlePendingTaskDelta)
   unsubscribeRealtime = subscribeRealtimeEvents(handleRealtime)
   if (auth.isAuthed) startRealtime()
