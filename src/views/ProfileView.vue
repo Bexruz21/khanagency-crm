@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import api from '../api'
 import UserAvatar from '../components/UserAvatar.vue'
 import AppIcon from '../components/AppIcon.vue'
@@ -12,6 +12,19 @@ const theme = useThemeStore()
 
 const tgChecking = ref(false)
 const tgResult = ref(null)
+const browserNotificationChecking = ref(false)
+const browserNotificationResult = ref(null)
+
+function testBrowserNotification() {
+  browserNotificationChecking.value = true
+  browserNotificationResult.value = null
+  window.dispatchEvent(new CustomEvent('browser-notification-test'))
+}
+
+function handleBrowserNotificationResult(event) {
+  browserNotificationChecking.value = false
+  browserNotificationResult.value = event.detail
+}
 
 async function testTelegram() {
   tgChecking.value = true
@@ -41,6 +54,7 @@ const form = reactive({
 })
 
 onMounted(async () => {
+  window.addEventListener('browser-notification-test-result', handleBrowserNotificationResult)
   if (!auth.user) await auth.fetchMe()
   Object.assign(form, {
     first_name: auth.user.first_name,
@@ -51,6 +65,10 @@ onMounted(async () => {
     avatar_color: auth.user.avatar_color,
     password: '',
   })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('browser-notification-test-result', handleBrowserNotificationResult)
 })
 
 async function save() {
@@ -104,6 +122,26 @@ async function save() {
         </button>
       </div>
     </div>
+
+    <section class="card notification-card rise">
+      <div>
+        <strong>Системные уведомления Chrome</strong>
+        <span>Проверка уведомлений, которые показываются поверх других вкладок.</span>
+        <p
+          v-if="browserNotificationResult"
+          class="notification-result"
+          :class="browserNotificationResult.ok ? 'ok' : 'err'"
+        >{{ browserNotificationResult.message }}</p>
+      </div>
+      <button
+        type="button"
+        class="btn outline"
+        :disabled="browserNotificationChecking"
+        @click="testBrowserNotification"
+      >
+        {{ browserNotificationChecking ? 'Проверяем…' : 'Проверить уведомление' }}
+      </button>
+    </section>
 
     <form class="card form rise" @submit.prevent="save">
       <div class="row2">
@@ -216,6 +254,24 @@ async function save() {
 .theme-opt:active { transform: scale(0.96); }
 .theme-opt.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
 
+.notification-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 16px 24px;
+}
+.notification-card > div { min-width: 0; }
+.notification-card strong,
+.notification-card span { display: block; }
+.notification-card strong { font-size: .95rem; }
+.notification-card span { margin-top: 3px; color: var(--muted); font-size: .78rem; line-height: 1.4; }
+.notification-card .btn { flex: none; }
+.notification-result { margin-top: 7px; font-size: .78rem; font-weight: 600; line-height: 1.4; }
+.notification-result.ok { color: var(--green); }
+.notification-result.err { color: var(--red); }
+
 .tg-row { display: flex; gap: 8px; }
 .tg-row .input { flex: 1; }
 .tg-row .btn { flex: none; }
@@ -300,6 +356,8 @@ async function save() {
   .theme-card { padding: 16px 18px; align-items: stretch; flex-direction: column; }
   .theme-switch { width: 100%; }
   .theme-opt { flex: 1; justify-content: center; padding-inline: 8px; min-height: 42px; }
+  .notification-card { align-items: stretch; flex-direction: column; padding: 16px 18px; }
+  .notification-card .btn { width: 100%; }
   .form { padding: 18px; }
   .row2 { grid-template-columns: 1fr; }
   .tg-row { flex-direction: column; }

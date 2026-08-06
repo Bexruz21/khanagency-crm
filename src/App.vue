@@ -99,7 +99,7 @@ async function showBrowserNotification(notification, force = false) {
   if (
     !browserNotificationsSupported
     || Notification.permission !== 'granted'
-    || (!force && !document.hidden)
+    || (!force && !document.hidden && document.hasFocus())
   ) return false
   try {
     const registration = await registerNotificationWorker()
@@ -108,6 +108,8 @@ async function showBrowserNotification(notification, force = false) {
         body: notification.text,
         tag: `khan-crm-${notification.id}`,
         data: { link: notification.link || '/' },
+        requireInteraction: true,
+        renotify: true,
       })
       return true
     }
@@ -125,6 +127,45 @@ async function showBrowserNotification(notification, force = false) {
   } catch {
     /* Некоторые мобильные браузеры объявляют API, но разрешают уведомления только установленному PWA. */
     return false
+  }
+}
+
+async function handleBrowserNotificationTest() {
+  try {
+    if (!browserNotificationsSupported) {
+      window.dispatchEvent(new CustomEvent('browser-notification-test-result', {
+        detail: { ok: false, message: 'Этот браузер не поддерживает системные уведомления.' },
+      }))
+      return
+    }
+
+    if (Notification.permission === 'default') {
+      browserNotificationPermission.value = await Notification.requestPermission()
+    }
+    if (Notification.permission !== 'granted') {
+      window.dispatchEvent(new CustomEvent('browser-notification-test-result', {
+        detail: { ok: false, message: 'Chrome не дал сайту разрешение на уведомления.' },
+      }))
+      return
+    }
+
+    const shown = await showBrowserNotification({
+      id: `manual-test-${Date.now()}`,
+      text: 'Тестовое уведомление KHAN CRM.',
+      link: '/profile',
+    }, true)
+    window.dispatchEvent(new CustomEvent('browser-notification-test-result', {
+      detail: {
+        ok: shown,
+        message: shown
+          ? 'Chrome принял тестовое уведомление. Если баннер не появился, его блокируют настройки операционной системы.'
+          : 'Service worker не смог отправить уведомление.',
+      },
+    }))
+  } catch {
+    window.dispatchEvent(new CustomEvent('browser-notification-test-result', {
+      detail: { ok: false, message: 'Chrome вернул ошибку при проверке уведомления.' },
+    }))
   }
 }
 
@@ -224,11 +265,13 @@ onMounted(() => {
     })
   }
   window.addEventListener('task-pending-delta', handlePendingTaskDelta)
+  window.addEventListener('browser-notification-test', handleBrowserNotificationTest)
   unsubscribeRealtime = subscribeRealtimeEvents(handleRealtime)
   if (auth.isAuthed) startRealtime()
 })
 onUnmounted(() => {
   window.removeEventListener('task-pending-delta', handlePendingTaskDelta)
+  window.removeEventListener('browser-notification-test', handleBrowserNotificationTest)
   unsubscribeRealtime?.()
   stopRealtime()
 })
