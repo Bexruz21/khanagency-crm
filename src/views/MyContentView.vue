@@ -32,7 +32,7 @@ const detailSaving = ref(false)
 const detailSyncing = ref(false)
 const detailError = ref('')
 const detailForm = reactive({
-  title: '', format: 'post', description: '', shooting_date: '', editing_deadline: '',
+  title: '', format: 'post', description: '', shooting_start_at: '', shooting_date: '', editing_deadline: '',
   publish_date: '', status: 'idea', comments: '', publication_url: '',
 })
 
@@ -137,6 +137,7 @@ async function openDetail(item) {
     title: data.title,
     format: data.format,
     description: data.description || '',
+    shooting_start_at: compactDateTime(data.shooting_start_at),
     shooting_date: compactDateTime(data.shooting_date),
     editing_deadline: compactDateTime(data.editing_deadline),
     publish_date: compactDateTime(data.publish_date),
@@ -188,6 +189,7 @@ async function saveDetail() {
       title: detailForm.title.trim(),
       format: detailForm.format,
       description: detailForm.description.trim(),
+      shooting_start_at: detailForm.shooting_start_at || null,
       shooting_date: detailForm.shooting_date || null,
       editing_deadline: detailForm.editing_deadline || null,
       publish_date: detailForm.publish_date || null,
@@ -287,10 +289,10 @@ async function saveExpense() {
       <div v-if="!items || loading" class="skeleton" style="height: 250px" />
       <template v-else>
         <div class="card desktop-table content-table">
-          <table><thead><tr><th>Контент</th><th>Формат</th><th>Съёмка</th><th>Монтаж</th><th>Публикация</th><th>Приоритет</th><th>Статус</th><th>Результат</th><th>Расход</th></tr></thead><tbody>
+          <table><thead><tr><th>Контент</th><th>Формат</th><th>Старт съёмки</th><th>Дедлайн съёмки</th><th>Монтаж</th><th>Публикация</th><th>Приоритет</th><th>Статус</th><th>Результат</th><th>Расход</th></tr></thead><tbody>
             <tr v-for="item in filteredItems" :key="item.id" class="content-row" @click="openDetail(item)">
               <td class="title-cell"><strong>{{ item.title }}</strong><span>{{ item.description || 'Описание не добавлено' }}</span></td>
-              <td>{{ CONTENT_FORMAT[item.format] }}</td><td>{{ fmtDate(item.shooting_date, true) }}</td><td>{{ fmtDate(item.editing_deadline, true) }}</td><td>{{ fmtDate(item.publish_date, true) }}</td><td><StatusBadge :map="PRIORITY" :value="item.priority" /></td>
+              <td>{{ CONTENT_FORMAT[item.format] }}</td><td>{{ fmtDate(item.shooting_start_at, true) }}</td><td>{{ fmtDate(item.shooting_date, true) }}</td><td>{{ fmtDate(item.editing_deadline, true) }}</td><td>{{ fmtDate(item.publish_date, true) }}</td><td><StatusBadge :map="PRIORITY" :value="item.priority" /></td>
               <td><select class="status-select" :value="item.status" :style="{ color: CONTENT_STATUS[item.status]?.color, background: CONTENT_STATUS[item.status]?.bg }" @click.stop @change="setStatus(item, $event.target.value)"><option v-for="(value, key) in CONTENT_STATUS" :key="key" :value="key">{{ value.label }}</option></select></td>
               <td><a v-if="item.publication_url" :href="item.publication_url" class="metric-link" target="_blank" rel="noopener" @click.stop><AppIcon name="instagram" :size="15" /> {{ Number(item.metric_views || 0).toLocaleString('ru-RU') }}</a><span v-else class="muted">—</span></td>
               <td><button class="expense-btn" title="Добавить расход" @click.stop="openExpense(item)"><AppIcon name="wallet" :size="16" /> Добавить</button></td>
@@ -302,7 +304,7 @@ async function saveExpense() {
         <div class="mobile-content-list">
           <article v-for="item in filteredItems" :key="item.id" class="card mobile-content-card" @click="openDetail(item)">
             <div class="mobile-card-head"><div><strong>{{ item.title }}</strong><span>{{ CONTENT_FORMAT[item.format] }}</span></div><StatusBadge :map="PRIORITY" :value="item.priority" /></div>
-            <div class="mobile-dates"><span><small>Съёмка</small>{{ fmtDate(item.shooting_date, true) }}</span><span><small>Монтаж</small>{{ fmtDate(item.editing_deadline, true) }}</span><span><small>Публикация</small>{{ fmtDate(item.publish_date, true) }}</span></div>
+            <div class="mobile-dates"><span><small>Старт съёмки</small>{{ fmtDate(item.shooting_start_at, true) }}</span><span><small>Дедлайн съёмки</small>{{ fmtDate(item.shooting_date, true) }}</span><span><small>Монтаж</small>{{ fmtDate(item.editing_deadline, true) }}</span><span><small>Публикация</small>{{ fmtDate(item.publish_date, true) }}</span></div>
             <div class="mobile-card-actions"><select class="status-select" :value="item.status" :style="{ color: CONTENT_STATUS[item.status]?.color, background: CONTENT_STATUS[item.status]?.bg }" @click.stop @change="setStatus(item, $event.target.value)"><option v-for="(value, key) in CONTENT_STATUS" :key="key" :value="key">{{ value.label }}</option></select><button class="expense-btn" @click.stop="openExpense(item)"><AppIcon name="wallet" :size="16" /> Расход</button></div>
             <a v-if="item.publication_url" class="mobile-result" :href="item.publication_url" target="_blank" rel="noopener" @click.stop><AppIcon name="instagram" :size="16" /><span>Просмотры {{ Number(item.metric_views || 0).toLocaleString('ru-RU') }}</span><span>Лайки {{ Number(item.metric_likes || 0).toLocaleString('ru-RU') }}</span></a>
           </article>
@@ -325,7 +327,7 @@ async function saveExpense() {
         <div class="form-grid"><div class="span-2"><label class="field">Название *</label><input v-model="detailForm.title" class="input" /></div><div><label class="field">Формат</label><select v-model="detailForm.format" class="select"><option v-for="(label, key) in CONTENT_FORMAT" :key="key" :value="key">{{ label }}</option></select></div><div><label class="field">Статус</label><select v-model="detailForm.status" class="select"><option v-for="(value, key) in CONTENT_STATUS" :key="key" :value="key">{{ value.label }}</option></select></div></div>
         <a v-if="detail?.script_file" :href="detail.script_file" target="_blank" rel="noopener" class="script-file-link"><span><AppIcon name="paperclip" :size="20" /></span><div><strong>Файл сценария</strong><small>{{ scriptFileName(detail.script_file) }}</small></div><b>Открыть</b></a>
         <div v-else><label class="field">Подробное описание и сценарий</label><textarea v-model="detailForm.description" class="textarea description-editor" rows="9" placeholder="Кадр 1: ...&#10;Кадр 2: ...&#10;Текст, реквизит и требования к съёмке..." /></div>
-        <div class="date-grid"><div><label class="field">Съёмка</label><input class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" :value="detailForm.shooting_date" @keydown="allowCompactDateKey" @input="maskedDate('shooting_date', $event)" /></div><div><label class="field">Монтаж</label><input class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" :value="detailForm.editing_deadline" @keydown="allowCompactDateKey" @input="maskedDate('editing_deadline', $event)" /></div><div><label class="field">Публикация</label><input class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" :value="detailForm.publish_date" @keydown="allowCompactDateKey" @input="maskedDate('publish_date', $event)" /></div></div>
+        <div class="date-grid"><div><label class="field">Старт съёмки</label><input class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" :value="detailForm.shooting_start_at" @keydown="allowCompactDateKey" @input="maskedDate('shooting_start_at', $event)" /></div><div><label class="field">Дедлайн съёмки</label><input class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" :value="detailForm.shooting_date" @keydown="allowCompactDateKey" @input="maskedDate('shooting_date', $event)" /></div><div><label class="field">Дедлайн монтажа</label><input class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" :value="detailForm.editing_deadline" @keydown="allowCompactDateKey" @input="maskedDate('editing_deadline', $event)" /></div><div><label class="field">Время публикации</label><input class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" :value="detailForm.publish_date" @keydown="allowCompactDateKey" @input="maskedDate('publish_date', $event)" /></div></div>
         <div><label class="field">Рабочие комментарии</label><textarea v-model="detailForm.comments" class="textarea" rows="4" placeholder="Что подготовить, уточнить или согласовать" /></div>
         <section v-if="detailForm.status === 'published' || detailForm.publication_url" class="employee-publication"><div><AppIcon name="instagram" :size="19" /><strong>Результат публикации</strong></div><label class="field">Ссылка на опубликованный Reels или Post</label><input v-model="detailForm.publication_url" type="url" class="input" placeholder="https://www.instagram.com/reel/..." /><div v-if="detail?.metrics_last_synced_at" class="employee-metrics"><span>Просмотры <strong>{{ Number(detail.metric_views || 0).toLocaleString('ru-RU') }}</strong></span><span>Лайки <strong>{{ Number(detail.metric_likes || 0).toLocaleString('ru-RU') }}</strong></span><span>Комментарии <strong>{{ Number(detail.metric_comments || 0).toLocaleString('ru-RU') }}</strong></span></div><button v-if="detailForm.publication_url" type="button" class="btn outline sm employee-sync" :disabled="detailSyncing" @click="refreshDetailMetrics"><AppIcon name="review" :size="15" /> {{ detailSyncing ? 'Обновляем…' : 'Обновить показатели' }}</button></section>
         <p v-if="detailError" class="form-error">{{ detailError }}</p>
@@ -725,6 +727,22 @@ async function saveExpense() {
   .my-content-page .form-grid,
   .my-content-page .date-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+.my-content-page .date-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 700px) {
+  .my-content-page .mobile-dates {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .my-content-page .mobile-dates > span:last-child {
+    grid-column: auto;
   }
 }
 

@@ -25,7 +25,7 @@ const saveError = ref('')
 const editingId = ref(null)
 const blank = {
   title: '', format: 'post', description: '', assignee: null,
-  shooting_date: null, editing_deadline: null, publish_date: null,
+  shooting_start_at: null, shooting_date: null, editing_deadline: null, publish_date: null,
   status: 'idea', comments: '',
   review_feedback: '', publication_url: '',
 }
@@ -194,7 +194,8 @@ async function openEdit(item) {
   saveError.value = ''
   Object.assign(form, {
     title: item.title, format: item.format, description: item.description,
-    assignee: item.assignee, shooting_date: compactDateTime(item.shooting_date),
+    assignee: item.assignee, shooting_start_at: compactDateTime(item.shooting_start_at),
+    shooting_date: compactDateTime(item.shooting_date),
     editing_deadline: compactDateTime(item.editing_deadline), publish_date: compactDateTime(item.publish_date),
     status: item.status,
     comments: item.comments,
@@ -228,7 +229,7 @@ async function saveItem() {
       description: scriptMode.value === 'manual' || scriptFile.value ? form.description : '',
       brand: props.brand.id,
     }
-    for (const key of ['shooting_date', 'editing_deadline', 'publish_date', 'assignee']) {
+    for (const key of ['shooting_start_at', 'shooting_date', 'editing_deadline', 'publish_date', 'assignee']) {
       if (payload[key] === '' || payload[key] === undefined) payload[key] = null
     }
     let itemId = editingId.value
@@ -372,7 +373,7 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
         <thead>
           <tr>
             <th>Название</th><th>Формат</th><th>Ответственный</th>
-            <th>Съёмка</th><th>Монтаж</th><th>Публикация</th>
+            <th>Старт съёмки</th><th>Дедлайн съёмки</th><th>Монтаж</th><th>Публикация</th>
             <th>Статус</th><th>Приоритет</th>
           </tr>
         </thead>
@@ -391,6 +392,7 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
               </span>
               <span v-else class="muted">—</span>
             </td>
+            <td>{{ fmtDate(item.shooting_start_at, true) }}</td>
             <td>{{ fmtDate(item.shooting_date, true) }}</td>
             <td>{{ fmtDate(item.editing_deadline, true) }}</td>
             <td>{{ fmtDate(item.publish_date, true) }}</td>
@@ -409,7 +411,7 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
             </td>
           </tr>
           <tr v-if="!filtered.length">
-            <td colspan="8" class="empty">Записей нет — добавьте вручную или сгенерируйте идеи с AI</td>
+            <td colspan="9" class="empty">Записей нет — добавьте вручную или сгенерируйте идеи с AI</td>
           </tr>
         </tbody>
       </table>
@@ -518,10 +520,11 @@ const selectedCount = computed(() => ideas.value.filter((i) => i.selected).lengt
             </button>
           </div>
         </div>
-        <div class="row3">
-          <div><label class="field">Съёмка</label><input :value="form.shooting_date" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.shooting_date = maskCompactDateTime($event.target.value)" /></div>
-          <div><label class="field">Монтаж</label><input :value="form.editing_deadline" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.editing_deadline = maskCompactDateTime($event.target.value)" /></div>
-          <div><label class="field">Публикация</label><input :value="form.publish_date" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.publish_date = maskCompactDateTime($event.target.value)" /></div>
+        <div class="row4">
+          <div><label class="field">Старт съёмки</label><input :value="form.shooting_start_at" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.shooting_start_at = maskCompactDateTime($event.target.value)" /></div>
+          <div><label class="field">Дедлайн съёмки</label><input :value="form.shooting_date" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.shooting_date = maskCompactDateTime($event.target.value)" /></div>
+          <div><label class="field">Дедлайн монтажа</label><input :value="form.editing_deadline" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.editing_deadline = maskCompactDateTime($event.target.value)" /></div>
+          <div><label class="field">Время публикации</label><input :value="form.publish_date" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.publish_date = maskCompactDateTime($event.target.value)" /></div>
         </div>
         <div>
           <label class="field">Ответственный</label>
@@ -683,6 +686,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .form { display: flex; flex-direction: column; gap: 13px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.row4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 
 .prio-row { display: flex; gap: 8px; align-items: center; }
 .prio-row .select { flex: 1; }
@@ -791,7 +795,7 @@ tbody tr:last-child td { border-bottom: 0; }
   .toolbar .select { width: 100% !important; }
   .actions { flex-wrap: wrap; }
   .actions .btn { flex: 1 1 auto; }
-  .row2, .row3 { grid-template-columns: 1fr; }
+  .row2, .row3, .row4 { grid-template-columns: 1fr; }
   .script-field { padding: 11px; }
   .script-heading { flex-direction: column; }
   .script-heading .btn { width: 100%; }
