@@ -113,7 +113,7 @@ onUnmounted(() => unsubscribeRealtime?.())
         <thead>
           <tr>
             <th>Задача</th><th>Бренд</th><th>Исполнитель</th>
-            <th>Дедлайн</th><th>Выполнено</th><th>Результат</th>
+            <th>Старт</th><th>Дедлайн</th><th>Выполнено</th><th>Результат</th>
           </tr>
         </thead>
         <tbody>
@@ -130,6 +130,7 @@ onUnmounted(() => unsubscribeRealtime?.())
                 <span>{{ task.assignee_detail?.full_name || '—' }}</span>
               </div>
             </td>
+            <td>{{ fmtDate(task.start_at, true) }}</td>
             <td>{{ fmtDate(task.deadline, true) }}</td>
             <td>{{ fmtDate(task.completed_at, true) }}</td>
             <td :class="task.coins_result < 0 ? 'negative' : 'positive'">
@@ -152,6 +153,7 @@ onUnmounted(() => unsubscribeRealtime?.())
           <div><span>Бренд</span><strong>{{ detail.brand_name || '—' }}</strong></div>
           <div><span>Исполнитель</span><strong>{{ detail.assignee_detail?.full_name || '—' }}</strong></div>
           <div><span>Создано</span><strong>{{ fmtDate(detail.created_at, true) }}</strong></div>
+          <div><span>Старт</span><strong>{{ fmtDate(detail.start_at, true) }}</strong></div>
           <div><span>Дедлайн</span><strong>{{ fmtDate(detail.deadline, true) }}</strong></div>
           <div><span>Выполнено</span><strong>{{ fmtDate(detail.completed_at, true) }}</strong></div>
           <div><span>Результат</span><strong :class="detail.coins_result < 0 ? 'negative' : 'positive'">{{ detail.coins_result ? Number(detail.coins_result).toLocaleString('ru-RU') : '—' }}</strong></div>

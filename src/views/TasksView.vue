@@ -34,13 +34,13 @@ const createModal = ref(false)
 const saving = ref(false)
 const blank = {
   title: '', description: '', brand: null, assignee: null,
-  participants: [], deadline: '', status: 'todo',
+  participants: [], start_at: '', deadline: '', status: 'todo',
 }
 const form = reactive({ ...blank })
 
 const detail = ref(null)       // подробная задача
 const detailEdit = reactive({
-  title: '', description: '', brand: null, assignee: null, participants: [], deadline: '',
+  title: '', description: '', brand: null, assignee: null, participants: [], start_at: '', deadline: '',
 })
 const detailSaving = ref(false)
 const statusSaving = ref(false)
@@ -75,6 +75,7 @@ function fillDetailEdit(task) {
     brand: task.brand,
     assignee: task.assignee,
     participants: [...(task.participants || [])],
+    start_at: compactDateTime(task.start_at),
     deadline: compactDateTime(task.deadline),
   })
 }
@@ -130,12 +131,15 @@ function adjustPendingCount(previous, next) {
 }
 
 function mutationError(action, error) {
-  const message = error?.response?.data?.detail
+  const data = error?.response?.data || {}
+  const fieldMessage = Object.entries(data).find(([key]) => key !== 'detail')?.[1]
+  const message = data.detail || (Array.isArray(fieldMessage) ? fieldMessage[0] : fieldMessage)
   toasts.push(message || `${action}. Изменение отменено.`, 'danger')
 }
 
 function optimisticTaskFields(fields) {
   const next = { ...fields }
+  if (Object.hasOwn(fields, 'start_at')) next.start_at = localDeadline(fields.start_at)
   if (Object.hasOwn(fields, 'deadline')) next.deadline = localDeadline(fields.deadline)
   if (Object.hasOwn(fields, 'assignee')) next.assignee_detail = userById(fields.assignee)
   if (Object.hasOwn(fields, 'brand')) next.brand_name = brandById(fields.brand)?.name || ''
@@ -263,6 +267,7 @@ async function createTask() {
     ...formSnapshot,
     title: formSnapshot.title.trim(),
     participants: formSnapshot.participants.filter((id) => id !== formSnapshot.assignee),
+    start_at: formSnapshot.start_at || null,
     deadline: formSnapshot.deadline || null,
   }
   const temporaryTask = {
@@ -326,6 +331,7 @@ async function saveDetailData() {
     brand: detailEdit.brand || null,
     assignee: detailEdit.assignee || null,
     participants: detailEdit.participants.filter((id) => id !== detailEdit.assignee),
+    start_at: detailEdit.start_at || null,
     deadline: detailEdit.deadline || null,
   }
   const optimistic = { ...detail.value, ...optimisticTaskFields(payload) }
@@ -355,7 +361,7 @@ function closeDetail() {
   detailSession += 1
   detailOpeningId.value = null
   Object.assign(detailEdit, {
-    title: '', description: '', brand: null, assignee: null, participants: [], deadline: '',
+    title: '', description: '', brand: null, assignee: null, participants: [], start_at: '', deadline: '',
   })
   detail.value = null
 }
@@ -571,7 +577,10 @@ function fileName(url) {
             <span class="proj">{{ t.brand_name || 'Без проекта' }}</span>
             <div class="task-bottom">
               <UserAvatar :user="t.assignee_detail" :size="24" />
-              <span class="dl" :class="{ red: t.is_overdue }">{{ fmtDate(t.deadline, true) }}</span>
+              <div class="task-dates">
+                <span v-if="t.start_at"><small>Старт</small>{{ fmtDate(t.start_at, true) }}</span>
+                <span class="dl" :class="{ red: t.is_overdue }"><small>Дедлайн</small>{{ fmtDate(t.deadline, true) }}</span>
+              </div>
               <span v-if="t.comments_count" class="cmt"><AppIcon name="message" :size="14" /> {{ t.comments_count }}</span>
             </div>
           </article>
@@ -615,9 +624,10 @@ function fileName(url) {
           </div>
         </div>
         <div class="row2">
+          <div><label class="field">Время старта</label><input :value="form.start_at" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.start_at = maskCompactDateTime($event.target.value)" /></div>
           <div><label class="field">Дедлайн</label><input :value="form.deadline" class="input" inputmode="numeric" maxlength="11" placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey" @input="$event.target.value = form.deadline = maskCompactDateTime($event.target.value)" /></div>
-          <div class="auto-priority-note"><span class="auto-mark">A</span><div><strong>Приоритет рассчитывается автоматически</strong><small>Он повышается по мере приближения дедлайна</small></div></div>
         </div>
+        <div class="auto-priority-note"><span class="auto-mark">A</span><div><strong>Приоритет рассчитывается автоматически</strong><small>Он повышается по мере приближения дедлайна</small></div></div>
       </div>
       <template #footer>
         <button class="btn outline" @click="createModal = false">Отмена</button>
@@ -681,6 +691,12 @@ function fileName(url) {
             </select>
           </div>
           <div>
+            <label class="field">Время старта</label>
+            <input :value="detailEdit.start_at" class="input" inputmode="numeric" maxlength="11"
+              placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey"
+              @input="$event.target.value = detailEdit.start_at = maskCompactDateTime($event.target.value)" />
+          </div>
+          <div>
             <label class="field">Дедлайн</label>
             <input :value="detailEdit.deadline" class="input" inputmode="numeric" maxlength="11"
               placeholder="ДД.ММ ЧЧ:ММ" @keydown="allowCompactDateKey"
@@ -728,6 +744,7 @@ function fileName(url) {
         <p class="meta">
           Статус: <strong>{{ TASK_STATUS[detail.status]?.label || detail.status }}</strong> ·
           Проект: <strong>{{ detail.brand_name || '—' }}</strong> ·
+          Старт: <strong>{{ fmtDate(detail.start_at, true) }}</strong> ·
           Дедлайн: <strong :style="detail.is_overdue ? 'color: var(--red)' : ''">{{ fmtDate(detail.deadline, true) }}</strong> ·
           Ответственный: <strong>{{ detail.assignee_detail?.full_name || '—' }}</strong> ·
           Создал: <strong>{{ detail.creator_detail?.full_name || '—' }}</strong>
@@ -843,6 +860,9 @@ function fileName(url) {
 .task h4 { font-size: 0.92rem; line-height: 1.3; }
 .proj { color: var(--muted); font-size: 0.78rem; }
 .task-bottom { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.task-dates { display: flex; min-width: 0; flex: 1; align-items: center; gap: 9px; }
+.task-dates > span { display: flex; flex-direction: column; color: var(--ink-2); font-size: .72rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.task-dates small { margin-bottom: 1px; color: var(--muted); font-size: .57rem; font-weight: 650; text-transform: uppercase; }
 .dl { font-size: 0.78rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .dl.red { color: var(--red); font-weight: 600; }
 .cmt { margin-left: auto; font-size: 0.76rem; color: var(--muted); }
