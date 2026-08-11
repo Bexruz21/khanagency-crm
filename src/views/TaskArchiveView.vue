@@ -223,10 +223,10 @@ onUnmounted(() => unsubscribeRealtime?.())
 .reset { white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
 table {
-  --archive-columns: minmax(220px, 2fr) minmax(120px, 0.9fr) minmax(190px, 1.35fr) 145px 145px 105px;
+  --archive-columns: minmax(220px, 2fr) minmax(120px, 0.9fr) minmax(190px, 1.35fr) 130px 130px 130px 110px;
   display: block;
   width: 100%;
-  min-width: 950px;
+  min-width: 1080px;
   border-collapse: collapse;
   font-size: 0.88rem;
 }
